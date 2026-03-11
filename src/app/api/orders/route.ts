@@ -37,58 +37,72 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { customerName, phone, address, items, paymentMethod } = body;
 
-    const createdOrders = [];
+    const createdOrders = await db.transaction(async (tx) => {
+      const results = [];
 
-    for (const item of items) {
-      // Check stock
-      const product = await db
-        .select()
-        .from(products)
-        .where(eq(products.id, item.productId));
+      for (const item of items) {
+        // Check stock
+        const product = await tx
+          .select()
+          .from(products)
+          .where(eq(products.id, item.productId));
 
-      if (product.length === 0) {
-        return NextResponse.json(
-          { error: `Product ${item.productId} not found` },
-          { status: 404 }
-        );
+        if (product.length === 0) {
+          throw new Error(`PRODUCT_NOT_FOUND:${item.productId}`);
+        }
+
+        if (product[0].stock < item.quantity) {
+          throw new Error(`INSUFFICIENT_STOCK:${product[0].name}`);
+        }
+
+        const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
+        const totalPrice = product[0].price * item.quantity;
+
+        const newOrder = await tx
+          .insert(orders)
+          .values({
+            orderId,
+            customerName,
+            phone,
+            address,
+            productId: item.productId,
+            quantity: item.quantity,
+            totalPrice,
+            paymentMethod,
+            orderStatus: "pending",
+          })
+          .returning();
+
+        // Update stock
+        await tx
+          .update(products)
+          .set({ stock: product[0].stock - item.quantity })
+          .where(eq(products.id, item.productId));
+
+        results.push(newOrder[0]);
       }
 
-      if (product[0].stock < item.quantity) {
-        return NextResponse.json(
-          { error: `Insufficient stock for ${product[0].name}` },
-          { status: 400 }
-        );
-      }
-
-      const orderId = `ORD-${uuidv4().slice(0, 8).toUpperCase()}`;
-      const totalPrice = product[0].price * item.quantity;
-
-      const newOrder = await db
-        .insert(orders)
-        .values({
-          orderId,
-          customerName,
-          phone,
-          address,
-          productId: item.productId,
-          quantity: item.quantity,
-          totalPrice,
-          paymentMethod,
-          orderStatus: "pending",
-        })
-        .returning();
-
-      // Update stock
-      await db
-        .update(products)
-        .set({ stock: product[0].stock - item.quantity })
-        .where(eq(products.id, item.productId));
-
-      createdOrders.push(newOrder[0]);
-    }
+      return results;
+    });
 
     return NextResponse.json(createdOrders, { status: 201 });
   } catch (error) {
+    if (error instanceof Error) {
+      if (error.message.startsWith("PRODUCT_NOT_FOUND:")) {
+        const productId = error.message.split(":")[1];
+        return NextResponse.json(
+          { error: `Product ${productId} not found` },
+          { status: 404 }
+        );
+      }
+      if (error.message.startsWith("INSUFFICIENT_STOCK:")) {
+        const productName = error.message.split(":")[1];
+        return NextResponse.json(
+          { error: `Insufficient stock for ${productName}` },
+          { status: 400 }
+        );
+      }
+    }
     return NextResponse.json({ error: "Failed to create order" }, { status: 500 });
   }
 }
