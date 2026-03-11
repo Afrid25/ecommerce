@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, real, serial, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, real, serial, boolean, index } from "drizzle-orm/pg-core";
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -23,7 +23,11 @@ export const orders = pgTable("orders", {
   paymentMethod: text("payment_method").notNull(), // cod, bkash, nagad
   orderStatus: text("order_status").notNull().default("pending"), // pending, confirmed, shipped, delivered, cancelled
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("idx_orders_product_id").on(table.productId),
+  index("idx_orders_order_status").on(table.orderStatus),
+  index("idx_orders_created_at").on(table.createdAt),
+]);
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -34,6 +38,9 @@ export const user = pgTable("user", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   role: text("role").default("user"),
+  banned: boolean("banned").default(false),
+  banReason: text("ban_reason"),
+  banExpires: timestamp("ban_expires"),
 });
 
 export const session = pgTable("session", {
