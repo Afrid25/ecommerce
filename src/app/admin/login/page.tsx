@@ -51,84 +51,100 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4">
-      <div className="bg-white rounded-xl shadow-sm border p-8 w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">
-            {isSignUp ? "Create Admin Account" : "Admin Login"}
+    <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-white dark:bg-black">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
+            {isSignUp ? "Create Account" : "Admin Access"}
           </h1>
-          <p className="text-gray-500 mt-2">
+          <p className="text-lg opacity-60">
             {isSignUp ? "Set up your admin account" : "Sign in to manage your store"}
           </p>
         </div>
 
+        {/* Error Message */}
         {error && (
-          <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">
+          <div className="border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 p-4 mb-6 text-sm font-medium">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6 mb-8">
+          {/* Name Field (Sign Up Only) */}
           {isSignUp && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <label className="block text-sm font-bold tracking-widest uppercase opacity-60 mb-3">
+                Name
+              </label>
               <input
                 type="text"
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
                 placeholder="Admin Name"
+                className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 px-4 py-3 focus:outline-none focus:border-black dark:focus:border-white transition"
               />
             </div>
           )}
 
+          {/* Email Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <label className="block text-sm font-bold tracking-widest uppercase opacity-60 mb-3">
+              Email
+            </label>
             <input
               type="email"
               required
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
               placeholder="admin@example.com"
+              className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 px-4 py-3 focus:outline-none focus:border-black dark:focus:border-white transition"
             />
           </div>
 
+          {/* Password Field */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-bold tracking-widest uppercase opacity-60 mb-3">
+              Password
+            </label>
             <input
               type="password"
               required
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
-              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
               placeholder="••••••••"
               minLength={8}
+              className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 px-4 py-3 focus:outline-none focus:border-black dark:focus:border-white transition"
             />
           </div>
 
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition font-semibold disabled:bg-gray-400"
+            className="w-full bg-black dark:bg-white text-white dark:text-black py-4 font-bold text-lg tracking-wide hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition"
           >
             {loading ? "Please wait..." : isSignUp ? "Create Account" : "Sign In"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          {isSignUp ? "Already have an account?" : "Don't have an account?"}{" "}
+        {/* Toggle Sign Up / Sign In */}
+        <div className="text-center border-t border-gray-200 dark:border-gray-800 pt-6">
+          <p className="text-sm opacity-60 mb-3">
+            {isSignUp ? "Already have an account?" : "Don't have an account?"}
+          </p>
           <button
             onClick={() => {
               setIsSignUp(!isSignUp);
               setError("");
             }}
-            className="text-indigo-600 hover:underline font-medium"
+            className="text-sm font-bold tracking-widest uppercase hover:opacity-60 transition"
           >
             {isSignUp ? "Sign In" : "Sign Up"}
           </button>
-        </p>
+        </div>
       </div>
     </div>
   );

@@ -35,42 +35,82 @@ export default function HomePage() {
       : products.filter((p) => p.category === selectedCategory);
 
   return (
-    <div>
+    <div className="bg-white dark:bg-black">
       {/* Hero Section */}
-      <section className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-          <div className="text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-4">
-              Welcome to <span className="text-yellow-300">ShopBD</span>
+      <section className="relative w-full h-screen md:h-[600px] flex items-center justify-center overflow-hidden bg-black dark:bg-white">
+        {/* Background Image with Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/40 dark:from-white/60 dark:to-white/40 z-10"></div>
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1200 600%22><defs><pattern id=%22grid%22 width=%2240%22 height=%2240%22 patternUnits=%22userSpaceOnUse%22><path d=%22M 40 0 L 0 0 0 40%22 fill=%22none%22 stroke=%22rgba(255,255,255,0.05)%22 stroke-width=%221%22/></pattern></defs><rect width=%221200%22 height=%22600%22 fill=%22black%22/><rect width=%221200%22 height=%22600%22 fill=%22url(%23grid)%22/></svg>')] opacity-30"></div>
+
+        {/* Content */}
+        <div className="relative z-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <div className="space-y-6 md:space-y-8">
+            {/* Badge */}
+            <div className="inline-block">
+              <span className="text-xs md:text-sm font-bold tracking-widest uppercase text-white dark:text-black opacity-80">
+                New Collection
+              </span>
+            </div>
+
+            {/* Main Headline */}
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight text-white dark:text-black leading-none">
+              Discover <br /> Premium Quality
             </h1>
-            <p className="text-lg md:text-xl text-indigo-100 mb-8 max-w-2xl mx-auto">
-              Discover amazing products at unbeatable prices. Fast delivery across Bangladesh with Cash on Delivery, bKash & Nagad.
+
+            {/* Subheadline */}
+            <p className="text-lg md:text-xl text-white/80 dark:text-black/80 max-w-2xl mx-auto leading-relaxed">
+              Experience excellence with our curated collection. Fast delivery across Bangladesh with flexible payment options.
             </p>
-            <a
-              href="#products"
-              className="inline-block bg-white text-indigo-600 px-8 py-3 rounded-full font-semibold hover:bg-gray-100 transition"
-            >
-              Shop Now
-            </a>
+
+            {/* CTA Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+              <a
+                href="#products"
+                className="btn-primary bg-white text-black hover:bg-gray-100 dark:bg-black dark:text-white dark:hover:bg-gray-900"
+              >
+                Shop Now
+              </a>
+              <a
+                href="#products"
+                className="btn-secondary text-white border-white hover:bg-white hover:text-black dark:text-black dark:border-black dark:hover:bg-black dark:hover:text-white"
+              >
+                Explore Collection
+              </a>
+            </div>
           </div>
+        </div>
+
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 animate-bounce">
+          <svg className="w-6 h-6 text-white dark:text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
         </div>
       </section>
 
       {/* Products Section */}
-      <section id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h2 className="text-3xl font-bold text-gray-900 mb-8">Our Products</h2>
+      <section id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
+        {/* Section Header */}
+        <div className="mb-16">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
+            Featured Products
+          </h2>
+          <p className="text-lg opacity-60 max-w-2xl">
+            Handpicked selection of premium items for every need.
+          </p>
+        </div>
 
         {/* Category Filter */}
         {categories.length > 1 && (
-          <div className="flex flex-wrap gap-2 mb-8">
+          <div className="mb-12 flex flex-wrap gap-3">
             {categories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                className={`px-6 py-2 text-sm font-semibold tracking-wide transition-all duration-300 ${
                   selectedCategory === cat
-                    ? "bg-indigo-600 text-white"
-                    : "bg-white text-gray-700 border hover:border-indigo-300"
+                    ? "bg-black text-white dark:bg-white dark:text-black"
+                    : "bg-gray-100 dark:bg-gray-900 text-black dark:text-white hover:bg-gray-200 dark:hover:bg-gray-800"
                 }`}
               >
                 {cat}
@@ -79,35 +119,49 @@ export default function HomePage() {
           </div>
         )}
 
+        {/* Loading State */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm border animate-pulse">
-                <div className="aspect-square bg-gray-200 rounded-t-xl" />
-                <div className="p-4 space-y-3">
-                  <div className="h-4 bg-gray-200 rounded w-1/3" />
-                  <div className="h-5 bg-gray-200 rounded w-2/3" />
-                  <div className="h-4 bg-gray-200 rounded" />
-                  <div className="h-10 bg-gray-200 rounded" />
-                </div>
+              <div key={i} className="space-y-4">
+                <div className="skeleton aspect-square w-full"></div>
+                <div className="skeleton h-4 w-1/3"></div>
+                <div className="skeleton h-5 w-2/3"></div>
+                <div className="skeleton h-4 w-full"></div>
+                <div className="skeleton h-12 w-full"></div>
               </div>
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="text-center py-32">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 mx-auto opacity-20 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
-            <h3 className="text-xl font-semibold text-gray-500">No products found</h3>
-            <p className="text-gray-400 mt-2">Products will appear here once added by the admin.</p>
+            <h3 className="text-2xl font-bold mb-2">No products found</h3>
+            <p className="opacity-60">Products will appear here once added by the admin.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {filtered.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
           </div>
         )}
+      </section>
+
+      {/* CTA Section */}
+      <section className="bg-black dark:bg-white text-white dark:text-black py-20 md:py-32">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-6">
+            Ready to Shop?
+          </h2>
+          <p className="text-lg opacity-80 mb-8 max-w-2xl mx-auto">
+            Join thousands of satisfied customers. Free shipping on orders over ৳5,000.
+          </p>
+          <a href="#products" className="btn-primary bg-white text-black hover:bg-gray-100 dark:bg-black dark:text-white dark:border-white dark:hover:bg-gray-900">
+            Start Shopping
+          </a>
+        </div>
       </section>
     </div>
   );
