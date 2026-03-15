@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { products } from "@/lib/db/schema";
+import { products, orders } from "@/lib/db/schema";
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
@@ -55,9 +55,25 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const productId = parseInt(id);
+
+    // Check if product has existing orders
+    const existingOrders = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.productId, productId))
+      .limit(1);
+
+    if (existingOrders.length > 0) {
+      return NextResponse.json(
+        { error: "Cannot delete product with existing orders. Consider setting stock to 0 instead." },
+        { status: 400 }
+      );
+    }
+
     const deleted = await db
       .delete(products)
-      .where(eq(products.id, parseInt(id)))
+      .where(eq(products.id, productId))
       .returning();
 
     if (deleted.length === 0) {
@@ -66,6 +82,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Product deleted" });
   } catch (error) {
+    console.error("Product deletion error:", error);
     return NextResponse.json({ error: "Failed to delete product" }, { status: 500 });
   }
 }

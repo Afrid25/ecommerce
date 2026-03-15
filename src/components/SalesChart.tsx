@@ -48,20 +48,20 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
       <div className="flex gap-2 mb-4">
         <button
           onClick={() => setView("daily")}
-          className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+          className={`px-4 py-1.5 text-sm font-bold tracking-wide transition ${
             view === "daily"
-              ? "bg-indigo-600 text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-black dark:bg-white text-white dark:text-black"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
           }`}
         >
           Daily
         </button>
         <button
           onClick={() => setView("monthly")}
-          className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+          className={`px-4 py-1.5 text-sm font-bold tracking-wide transition ${
             view === "monthly"
-              ? "bg-indigo-600 text-white"
-              : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              ? "bg-black dark:bg-white text-white dark:text-black"
+              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
           }`}
         >
           Monthly
@@ -82,7 +82,7 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
               formatter={(value) => [`৳${Number(value).toLocaleString()}`, "Revenue"]}
               labelFormatter={(label) => `Date: ${label}`}
             />
-            <Bar dataKey="revenue" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="revenue" fill="#000000" radius={[4, 4, 0, 0]} />
           </BarChart>
         ) : (
           <LineChart data={monthlyRevenue}>
@@ -96,7 +96,7 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
             <Line
               type="monotone"
               dataKey="revenue"
-              stroke="#4f46e5"
+              stroke="#000000"
               strokeWidth={2}
               dot={{ r: 4 }}
             />

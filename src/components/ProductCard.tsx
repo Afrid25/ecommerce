@@ -24,7 +24,8 @@ export default function ProductCard({ product }: { product: Product }) {
           <img
             src={product.image}
             alt={product.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out"
+            loading="lazy"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
           />
           {/* Stock Badge */}
           {product.stock === 0 && (
@@ -36,7 +37,7 @@ export default function ProductCard({ product }: { product: Product }) {
       </Link>
 
       {/* Product Info */}
-      <div className="space-y-3">
+      <div className="space-y-1 sm:space-y-3">
         {/* Category */}
         <span className="text-xs font-bold tracking-widest uppercase opacity-60">
           {product.category}
@@ -50,7 +51,7 @@ export default function ProductCard({ product }: { product: Product }) {
         </Link>
 
         {/* Description */}
-        <p className="text-xs opacity-60 line-clamp-1">{product.description}</p>
+        <p className="text-xs opacity-60 line-clamp-1 hidden sm:block">{product.description}</p>
 
         {/* Price and Stock */}
         <div className="flex items-center justify-between pt-2">
@@ -72,7 +73,7 @@ export default function ProductCard({ product }: { product: Product }) {
             })
           }
           disabled={product.stock === 0}
-          className="w-full mt-4 py-3 bg-black dark:bg-white text-white dark:text-black font-semibold text-sm hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="w-full mt-2 sm:mt-4 py-2 sm:py-3 bg-black dark:bg-white text-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
           {product.stock > 0 ? "Add to Cart" : "Out of Stock"}
         </button>

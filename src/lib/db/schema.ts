@@ -13,7 +13,7 @@ export const products = pgTable("products", {
 
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
-  orderId: text("order_id").notNull().unique(),
+  orderId: text("order_id").notNull(),
   customerName: text("customer_name").notNull(),
   phone: text("phone").notNull(),
   address: text("address").notNull(),

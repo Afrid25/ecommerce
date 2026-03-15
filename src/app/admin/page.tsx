@@ -88,7 +88,7 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-12 gap-6">
           <div>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-2">Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight mb-2">Dashboard</h1>
             <p className="text-lg opacity-60">Welcome back, {session.user?.name}</p>
           </div>
           <div className="flex flex-wrap gap-3">

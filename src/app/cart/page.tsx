@@ -12,7 +12,7 @@ export default function CartPage() {
 
   if (!mounted) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
         <div className="space-y-6">
           <div className="skeleton h-10 w-1/4"></div>
           <div className="skeleton h-32 w-full"></div>
@@ -42,10 +42,10 @@ export default function CartPage() {
 
   return (
     <div className="bg-white dark:bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
         {/* Header */}
         <div className="flex items-center justify-between mb-12">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight">Shopping Cart</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight">Shopping Cart</h1>
           <button
             onClick={clearCart}
             className="text-sm font-semibold opacity-60 hover:opacity-100 transition"
@@ -60,7 +60,7 @@ export default function CartPage() {
             {items.map((item) => (
               <div
                 key={item.id}
-                className="border border-gray-200 dark:border-gray-800 p-6 flex gap-6 group"
+                className="border border-gray-200 dark:border-gray-800 p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:gap-6 group"
               >
                 {/* Product Image */}
                 <div className="w-24 h-24 md:w-32 md:h-32 flex-shrink-0 bg-gray-100 dark:bg-gray-900 overflow-hidden">
@@ -108,7 +108,7 @@ export default function CartPage() {
                 </div>
 
                 {/* Line Total */}
-                <div className="flex flex-col justify-between items-end">
+                <div className="hidden sm:flex flex-col justify-between items-end">
                   <span className="text-sm opacity-60">Subtotal</span>
                   <span className="text-2xl font-black">
                     ৳{(item.price * item.quantity).toLocaleString()}

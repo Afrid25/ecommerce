@@ -66,11 +66,11 @@ export default function CheckoutPage() {
 
   return (
     <div className="bg-white dark:bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
         {/* Header */}
-        <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-12">Checkout</h1>
+        <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight mb-8 md:mb-12">Checkout</h1>
 
-        <div className="grid lg:grid-cols-3 gap-12">
+        <div className="grid lg:grid-cols-3 gap-8 md:gap-12">
           {/* Checkout Form */}
           <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-8">
             {/* Delivery Information */}

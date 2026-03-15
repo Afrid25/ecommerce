@@ -90,14 +90,15 @@ export default function ProductDetailPage() {
       </div>
 
       {/* Product Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-24">
-        <div className="grid md:grid-cols-2 gap-12 md:gap-16 lg:gap-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
+        <div className="grid md:grid-cols-2 gap-8 md:gap-12 lg:gap-20">
           {/* Image Section */}
           <div className="flex items-center">
             <div className="w-full aspect-square overflow-hidden bg-gray-100 dark:bg-gray-900">
               <img
                 src={product.image}
                 alt={product.name}
+                loading="lazy"
                 className="w-full h-full object-cover"
               />
             </div>
@@ -111,13 +112,13 @@ export default function ProductDetailPage() {
             </span>
 
             {/* Product Name */}
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-6 leading-tight">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black tracking-tight mb-4 md:mb-6 leading-tight">
               {product.name}
             </h1>
 
             {/* Price */}
-            <div className="mb-8">
-              <p className="text-4xl md:text-5xl font-black">
+            <div className="mb-6 md:mb-8">
+              <p className="text-2xl sm:text-3xl md:text-4xl font-black">
                 ৳{product.price.toLocaleString()}
               </p>
             </div>

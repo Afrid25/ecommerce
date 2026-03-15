@@ -20,7 +20,7 @@ function OrderConfirmationContent() {
           </div>
 
           {/* Main Message */}
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight mb-4">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight mb-4">
             Order Confirmed
           </h1>
           <p className="text-lg opacity-60 max-w-md mx-auto">

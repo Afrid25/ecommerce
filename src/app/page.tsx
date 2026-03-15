@@ -37,7 +37,7 @@ export default function HomePage() {
   return (
     <div className="bg-white dark:bg-black">
       {/* Hero Section */}
-      <section className="relative w-full h-screen md:h-[600px] flex items-center justify-center overflow-hidden bg-black dark:bg-white">
+      <section className="relative w-full min-h-[70vh] md:h-[600px] flex items-center justify-center overflow-hidden bg-black dark:bg-white">
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/40 dark:from-white/60 dark:to-white/40 z-10"></div>
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 1200 600%22><defs><pattern id=%22grid%22 width=%2240%22 height=%2240%22 patternUnits=%22userSpaceOnUse%22><path d=%22M 40 0 L 0 0 0 40%22 fill=%22none%22 stroke=%22rgba(255,255,255,0.05)%22 stroke-width=%221%22/></pattern></defs><rect width=%221200%22 height=%22600%22 fill=%22black%22/><rect width=%221200%22 height=%22600%22 fill=%22url(%23grid)%22/></svg>')] opacity-30"></div>
@@ -53,7 +53,7 @@ export default function HomePage() {
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight text-white dark:text-black leading-none">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black tracking-tight text-white dark:text-black leading-none">
               Discover <br /> Premium Quality
             </h1>
 
@@ -89,7 +89,7 @@ export default function HomePage() {
       </section>
 
       {/* Products Section */}
-      <section id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
+      <section id="products" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20 lg:py-32">
         {/* Section Header */}
         <div className="mb-16">
           <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
@@ -121,7 +121,7 @@ export default function HomePage() {
 
         {/* Loading State */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
             {[...Array(8)].map((_, i) => (
               <div key={i} className="space-y-4">
                 <div className="skeleton aspect-square w-full"></div>
@@ -141,7 +141,7 @@ export default function HomePage() {
             <p className="opacity-60">Products will appear here once added by the admin.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
             {filtered.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}

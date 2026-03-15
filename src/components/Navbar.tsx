@@ -83,22 +83,26 @@ export default function Navbar() {
         </div>
 
         {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-gray-200 dark:border-gray-800 py-4 space-y-4">
-            <Link href="/" className="block text-sm font-medium hover:text-gray-600 dark:hover:text-gray-300">
+        <div
+          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
+            mobileMenuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
+          }`}
+        >
+          <div className="border-t border-gray-200 dark:border-gray-800 py-4 space-y-1">
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
               Shop
             </Link>
-            <Link href="/" className="block text-sm font-medium hover:text-gray-600 dark:hover:text-gray-300">
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
               New Arrivals
             </Link>
-            <Link href="/" className="block text-sm font-medium hover:text-gray-600 dark:hover:text-gray-300">
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
               Sale
             </Link>
-            <Link href="/admin" className="block text-sm font-medium hover:text-gray-600 dark:hover:text-gray-300">
+            <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
               Admin
             </Link>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

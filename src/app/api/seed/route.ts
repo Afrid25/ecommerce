@@ -102,6 +102,14 @@ const sampleProducts = [
 ];
 
 export async function POST() {
+  // Only allow seeding in development
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Seeding is not allowed in production" },
+      { status: 403 }
+    );
+  }
+
   try {
     const inserted = await db.insert(products).values(sampleProducts).returning();
     return NextResponse.json({

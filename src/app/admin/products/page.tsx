@@ -99,8 +99,12 @@ export default function AdminProductsPage() {
 
     try {
       const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
-      if (res.ok) fetchProducts();
-      else alert("Failed to delete product");
+      if (res.ok) {
+        fetchProducts();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to delete product");
+      }
     } catch {
       alert("Something went wrong");
     }
@@ -112,12 +116,12 @@ export default function AdminProductsPage() {
     <div className="bg-white dark:bg-black">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
         {/* Header */}
-        <div className="flex items-center justify-between mb-12">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 md:mb-12 gap-4">
           <div>
             <Link href="/admin" className="text-sm font-bold opacity-60 hover:opacity-100 transition mb-3 inline-block">
               ← Back to Dashboard
             </Link>
-            <h1 className="text-4xl md:text-5xl font-black tracking-tight">Product Management</h1>
+            <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight">Product Management</h1>
           </div>
           <button
             onClick={() => {

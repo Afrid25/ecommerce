@@ -65,8 +65,12 @@ export default function AdminOrdersPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderStatus }),
       });
-      if (res.ok) fetchOrders();
-      else alert("Failed to update status");
+      if (res.ok) {
+        fetchOrders();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to update status");
+      }
     } catch {
       alert("Something went wrong");
     } finally {
@@ -89,7 +93,7 @@ export default function AdminOrdersPage() {
           <Link href="/admin" className="text-sm font-bold opacity-60 hover:opacity-100 transition mb-3 inline-block">
             ← Back to Dashboard
           </Link>
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight">Order Management</h1>
+          <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight">Order Management</h1>
         </div>
 
         {/* Status Filter */}
