@@ -1,94 +1,172 @@
-import { db } from "@/lib/db";
-import { orders, products } from "@/lib/db/schema";
+import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
-import { eq, sql, desc } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth-guards";
+import { db } from "@/lib/db";
+import { orderItems, orders, products } from "@/lib/db/schema";
+import { ensureCommerceSchema } from "@/lib/commerce";
 
-export async function GET() {
-  try {
-    // Total revenue
-    const revenueResult = await db
-      .select({ total: sql<number>`COALESCE(SUM(${orders.totalPrice}), 0)` })
-      .from(orders)
-      .where(sql`${orders.orderStatus} != 'cancelled'`);
+const getCachedAnalytics = unstable_cache(
+  async () => {
+    await ensureCommerceSchema();
+    let totalRevenue = 0;
+    try {
+      const revenueResult = await db
+        .select({ total: sql<number>`COALESCE(SUM(${orders.totalPrice}), 0)` })
+        .from(orders)
+        .where(sql`${orders.orderStatus} != 'cancelled'`);
+      totalRevenue = revenueResult[0]?.total || 0;
+    } catch (err) {
+      console.error("Failed to fetch total revenue:", err);
+    }
 
-    // Total orders
-    const ordersCount = await db
-      .select({ count: sql<number>`COUNT(*)` })
-      .from(orders);
+    let totalOrders = 0;
+    try {
+      const ordersCount = await db.select({ count: sql<number>`COUNT(*)` }).from(orders);
+      totalOrders = ordersCount[0]?.count || 0;
+    } catch (err) {
+      console.error("Failed to fetch total orders:", err);
+    }
 
-    // Best selling products
-    const bestSelling = await db
-      .select({
-        productId: orders.productId,
-        productName: products.name,
-        totalSold: sql<number>`SUM(${orders.quantity})`,
-        revenue: sql<number>`SUM(${orders.totalPrice})`,
-      })
-      .from(orders)
-      .leftJoin(products, eq(orders.productId, products.id))
-      .where(sql`${orders.orderStatus} != 'cancelled'`)
-      .groupBy(orders.productId, products.name)
-      .orderBy(sql`SUM(${orders.quantity}) DESC`)
-      .limit(5);
+    let totalProducts = 0;
+    try {
+      const productCount = await db.select({ count: sql<number>`COUNT(*)` }).from(products);
+      totalProducts = productCount[0]?.count || 0;
+    } catch (err) {
+      console.error("Failed to fetch total products:", err);
+    }
 
-    // Low stock products
-    const lowStock = await db
-      .select()
-      .from(products)
-      .where(sql`${products.stock} <= 10`)
-      .orderBy(products.stock);
+    let bestSelling: Array<{
+      productId: number;
+      productName: string | null;
+      totalSold: number;
+      revenue: number;
+    }> = [];
+    try {
+      bestSelling = await db
+        .select({
+          productId: orderItems.productId,
+          productName: products.name,
+          totalSold: sql<number>`COALESCE(SUM(${orderItems.quantity}),0)`,
+          revenue: sql<number>`COALESCE(SUM(${orderItems.totalPrice}),0)`,
+        })
+        .from(orderItems)
+        .innerJoin(orders, eq(orderItems.orderId, orders.id))
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .where(sql`${orders.orderStatus} != 'cancelled'`)
+        .groupBy(orderItems.productId, products.name)
+        .orderBy(sql`SUM(${orderItems.quantity}) DESC`)
+        .limit(5);
+    } catch (err) {
+      console.error("Failed to fetch best selling products:", err);
+    }
 
-    // Recent orders
-    const recentOrders = await db
-      .select({
-        id: orders.id,
-        orderId: orders.orderId,
-        customerName: orders.customerName,
-        totalPrice: orders.totalPrice,
-        orderStatus: orders.orderStatus,
-        paymentMethod: orders.paymentMethod,
-        createdAt: orders.createdAt,
-        productName: products.name,
-      })
-      .from(orders)
-      .leftJoin(products, eq(orders.productId, products.id))
-      .orderBy(desc(orders.createdAt))
-      .limit(10);
+    let lowStock: Array<{
+      id: number;
+      name: string;
+      description: string;
+      price: number;
+      image: string;
+      category: string;
+      stock: number;
+      createdAt: Date;
+    }> = [];
+    try {
+      lowStock = await db
+        .select()
+        .from(products)
+        .where(sql`${products.stock} <= 10`)
+        .orderBy(products.stock);
+    } catch (err) {
+      console.error("Failed to fetch low stock products:", err);
+    }
 
-    // Daily revenue (last 30 days)
-    const dailyRevenue = await db
-      .select({
-        date: sql<string>`TO_CHAR(${orders.createdAt}, 'YYYY-MM-DD')`,
-        revenue: sql<number>`SUM(${orders.totalPrice})`,
-        orderCount: sql<number>`COUNT(*)`,
-      })
-      .from(orders)
-      .where(sql`${orders.orderStatus} != 'cancelled' AND ${orders.createdAt} >= NOW() - INTERVAL '30 days'`)
-      .groupBy(sql`TO_CHAR(${orders.createdAt}, 'YYYY-MM-DD')`)
-      .orderBy(sql`TO_CHAR(${orders.createdAt}, 'YYYY-MM-DD')`);
+    let recentOrders: Array<{
+      id: number;
+      orderId: string;
+      customerName: string;
+      totalPrice: number;
+      orderStatus: string;
+      paymentMethod: string;
+      createdAt: Date;
+      source: string;
+    }> = [];
+    try {
+      recentOrders = await db
+        .select({
+          id: orders.id,
+          orderId: orders.orderId,
+          customerName: orders.customerName,
+          totalPrice: orders.totalPrice,
+          orderStatus: orders.orderStatus,
+          paymentMethod: orders.paymentMethod,
+          createdAt: orders.createdAt,
+          source: orders.source,
+        })
+        .from(orders)
+        .orderBy(desc(orders.createdAt))
+        .limit(10);
+    } catch (err) {
+      console.error("Failed to fetch recent orders:", err);
+    }
 
-    // Monthly revenue (last 12 months)
-    const monthlyRevenue = await db
-      .select({
-        month: sql<string>`TO_CHAR(${orders.createdAt}, 'YYYY-MM')`,
-        revenue: sql<number>`SUM(${orders.totalPrice})`,
-        orderCount: sql<number>`COUNT(*)`,
-      })
-      .from(orders)
-      .where(sql`${orders.orderStatus} != 'cancelled' AND ${orders.createdAt} >= NOW() - INTERVAL '12 months'`)
-      .groupBy(sql`TO_CHAR(${orders.createdAt}, 'YYYY-MM')`)
-      .orderBy(sql`TO_CHAR(${orders.createdAt}, 'YYYY-MM')`);
+    let dailyRevenue: Array<{ date: unknown; revenue: number }> = [];
+    try {
+      dailyRevenue = await db
+        .select({
+          date: sql`DATE(${orders.createdAt})`,
+          revenue: sql<number>`COALESCE(SUM(${orders.totalPrice}), 0)`,
+        })
+        .from(orders)
+        .where(sql`${orders.orderStatus} != 'cancelled'`)
+        .groupBy(sql`DATE(${orders.createdAt})`)
+        .orderBy(sql`DATE(${orders.createdAt}) DESC`)
+        .limit(30);
+    } catch (err) {
+      console.error("Failed to fetch daily revenue:", err);
+    }
 
-    return NextResponse.json({
-      totalRevenue: revenueResult[0]?.total || 0,
-      totalOrders: ordersCount[0]?.count || 0,
+    let monthlyRevenue: Array<{ month: unknown; revenue: number }> = [];
+    try {
+      monthlyRevenue = await db
+        .select({
+          month: sql`DATE_TRUNC('month', ${orders.createdAt})`,
+          revenue: sql<number>`COALESCE(SUM(${orders.totalPrice}), 0)`,
+        })
+        .from(orders)
+        .where(sql`${orders.orderStatus} != 'cancelled'`)
+        .groupBy(sql`DATE_TRUNC('month', ${orders.createdAt})`)
+        .orderBy(sql`DATE_TRUNC('month', ${orders.createdAt}) DESC`)
+        .limit(12);
+    } catch (err) {
+      console.error("Failed to fetch monthly revenue:", err);
+    }
+
+    return {
+      totalRevenue,
+      totalOrders,
+      totalProducts,
       bestSelling,
       lowStock,
       recentOrders,
       dailyRevenue,
       monthlyRevenue,
-    });
+    };
+  },
+  ["analytics-dashboard"],
+  { revalidate: 60, tags: ["analytics"] }
+);
+
+export async function GET() {
+  try {
+    const { response } = await requireAdmin();
+    if (response) {
+      return response;
+    }
+
+    return NextResponse.json(await getCachedAnalytics());
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch analytics" }, { status: 500 });
+    console.error("Analytics API error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -1,6 +1,11 @@
-import { db } from "@/lib/db";
-import { products, orders } from "@/lib/db/schema";
+import { db, isDatabaseConfigured } from "@/lib/db";
+import { products, orderItems } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth-guards";
+import { ensureCommerceSchema, getCategoryRecords } from "@/lib/commerce";
+import { getFallbackCatalogProducts } from "@/lib/catalog-fallback";
+import { parseProductFormData, parseProductJson } from "@/lib/validators";
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { eq } from "drizzle-orm";
 
 export async function GET(
@@ -9,6 +14,16 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    if (!isDatabaseConfigured()) {
+      const product = getFallbackCatalogProducts().find((item) => item.id === parseInt(id));
+      if (!product) {
+        return NextResponse.json({ error: "Product not found" }, { status: 404 });
+      }
+
+      return NextResponse.json(product);
+    }
+
+    await ensureCommerceSchema();
     const product = await db
       .select()
       .from(products)
@@ -19,7 +34,7 @@ export async function GET(
     }
 
     return NextResponse.json(product[0]);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch product" }, { status: 500 });
   }
 }
@@ -29,13 +44,43 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { response } = await requireAdmin();
+    if (response) {
+      return response;
+    }
+
     const { id } = await params;
-    const body = await req.json();
-    const { name, description, price, image, category, stock } = body;
+    const contentType = req.headers.get("content-type") || "";
+    const parsed = contentType.includes("multipart/form-data")
+      ? parseProductFormData(await req.formData())
+      : parseProductJson(await req.json());
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid product payload" },
+        { status: 400 }
+      );
+    }
+
+    const { name, description, price, image, stock } = parsed.data;
+    const categories = await getCategoryRecords();
+    const matchedCategory = categories.find((entry) => entry.slug === parsed.data.categorySlug);
+
+    if (!matchedCategory) {
+      return NextResponse.json({ error: "Selected category was not found" }, { status: 400 });
+    }
 
     const updated = await db
       .update(products)
-      .set({ name, description, price, image, category, stock })
+      .set({
+        name: name.trim(),
+        description: description.trim(),
+        price,
+        image: image.trim(),
+        category: matchedCategory.name,
+        categorySlug: matchedCategory.slug,
+        stock,
+      })
       .where(eq(products.id, parseInt(id)))
       .returning();
 
@@ -43,8 +88,10 @@ export async function PUT(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    revalidateTag("analytics", "max");
+    revalidateTag("catalog", "max");
     return NextResponse.json(updated[0]);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to update product" }, { status: 500 });
   }
 }
@@ -54,14 +101,19 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { response } = await requireAdmin();
+    if (response) {
+      return response;
+    }
+
     const { id } = await params;
     const productId = parseInt(id);
 
     // Check if product has existing orders
     const existingOrders = await db
       .select()
-      .from(orders)
-      .where(eq(orders.productId, productId))
+      .from(orderItems)
+      .where(eq(orderItems.productId, productId))
       .limit(1);
 
     if (existingOrders.length > 0) {
@@ -80,6 +132,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
 
+    revalidateTag("analytics", "max");
+    revalidateTag("catalog", "max");
     return NextResponse.json({ message: "Product deleted" });
   } catch (error) {
     console.error("Product deletion error:", error);

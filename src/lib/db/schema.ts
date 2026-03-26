@@ -1,4 +1,14 @@
-import { pgTable, text, timestamp, integer, real, serial, boolean } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  text,
+  timestamp,
+  integer,
+  real,
+  serial,
+  boolean,
+  uniqueIndex,
+  index,
+} from "drizzle-orm/pg-core";
 
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
@@ -7,7 +17,17 @@ export const products = pgTable("products", {
   price: real("price").notNull(),
   image: text("image").notNull(),
   category: text("category").notNull(),
+  categorySlug: text("category_slug").notNull().default(""),
   stock: integer("stock").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  image: text("image").notNull(),
+  description: text("description").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -15,15 +35,38 @@ export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderId: text("order_id").notNull(),
   customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
   phone: text("phone").notNull(),
   address: text("address").notNull(),
-  productId: integer("product_id").notNull().references(() => products.id),
-  quantity: integer("quantity").notNull(),
-  totalPrice: real("total_price").notNull(),
   paymentMethod: text("payment_method").notNull(), // cod, bkash, nagad
+  source: text("source").notNull().default("online"),
   orderStatus: text("order_status").notNull().default("pending"), // pending, confirmed, shipped, delivered, cancelled
+  notes: text("notes"),
+  totalPrice: real("total_price").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  orderIdIdx: uniqueIndex("orders_order_id_idx").on(table.orderId),
+  statusIdx: index("orders_status_idx").on(table.orderStatus),
+  createdAtIdx: index("orders_created_at_idx").on(table.createdAt),
+}));
+
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  productId: integer("product_id")
+    .notNull()
+    .references(() => products.id),
+  quantity: integer("quantity").notNull(),
+  unitPrice: real("unit_price").notNull(),
+  totalPrice: real("total_price").notNull(),
+  productName: text("product_name").notNull().default(""),
+  productImage: text("product_image").notNull().default(""),
+}, (table) => ({
+  orderIdx: index("order_items_order_idx").on(table.orderId),
+  productIdx: index("order_items_product_idx").on(table.productId),
+}));
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -71,3 +114,4 @@ export const verification = pgTable("verification", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+

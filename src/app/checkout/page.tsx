@@ -1,39 +1,86 @@
 "use client";
 
-import { useCartStore } from "@/store/cart";
-import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useHydrated } from "@/hooks/useHydrated";
+import { formatCurrency } from "@/lib/format";
+import { useCartStore } from "@/store/cart";
+import { useToastStore } from "@/store/toast";
 
-export default function CheckoutPage() {
-  const [mounted, setMounted] = useState(false);
-  const { items, getTotalPrice, clearCart } = useCartStore();
+function CheckoutContent() {
+  const mounted = useHydrated();
+  const searchParams = useSearchParams();
   const router = useRouter();
+  const { items, checkoutItems, clearCart, clearCheckoutItems } = useCartStore();
+  const showToast = useToastStore((state) => state.showToast);
   const [loading, setLoading] = useState(false);
+  const [dbAvailable, setDbAvailable] = useState(true);
+  const [dbMessage, setDbMessage] = useState("");
   const [form, setForm] = useState({
     customerName: "",
+    customerEmail: "",
     phone: "",
     address: "",
     paymentMethod: "cod",
+    mobileWalletNumber: "",
+    otpCode: "",
+    paymentReference: "",
   });
 
-  useEffect(() => setMounted(true), []);
+  const isBuyNowCheckout = searchParams.get("mode") === "buy-now";
+  const lineItems = isBuyNowCheckout && checkoutItems.length > 0 ? checkoutItems : items;
+  const totalPrice = lineItems.reduce((total, item) => total + item.price * item.quantity, 0);
 
-  if (!mounted) return null;
+  useEffect(() => {
+    const checkAvailability = async () => {
+      try {
+        const res = await fetch("/api/place-order", { method: "GET", cache: "no-store" });
+        const data = await res.json().catch(() => null);
 
-  if (items.length === 0) {
+        if (!res.ok || !data?.available) {
+          setDbAvailable(false);
+          setDbMessage(data?.error || "Checkout is temporarily unavailable.");
+          return;
+        }
+
+        setDbAvailable(true);
+        setDbMessage("");
+      } catch {
+        setDbAvailable(false);
+        setDbMessage("Checkout is temporarily unavailable.");
+      }
+    };
+
+    checkAvailability();
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
+  if (lineItems.length === 0) {
     return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-32 text-center">
-        <h2 className="text-3xl md:text-4xl font-black mb-4">No items to checkout</h2>
-        <Link href="/" className="text-sm font-semibold opacity-60 hover:opacity-100 transition">
-          ← Continue Shopping
+      <div className="mx-auto max-w-7xl px-4 py-32 text-center sm:px-6 lg:px-8">
+        <h2 className="mb-4 text-3xl font-black md:text-4xl">No items to checkout</h2>
+        <Link href="/shop" className="text-sm font-semibold opacity-60 transition hover:opacity-100">
+          Continue Shopping
         </Link>
       </div>
     );
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const isMobilePayment = form.paymentMethod === "bkash" || form.paymentMethod === "nagad";
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!dbAvailable) {
+      showToast(dbMessage || "Checkout is temporarily unavailable.", "error");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -42,193 +89,214 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          items: items.map((item) => ({
+          source: "online",
+          items: lineItems.map((item) => ({
             productId: item.id,
             quantity: item.quantity,
           })),
         }),
       });
 
-      if (res.ok) {
-        const orders = await res.json();
-        clearCart();
-        router.push(`/order-confirmation?orderId=${orders[0]?.orderId}`);
-      } else {
-        const error = await res.json();
-        alert(error.error || "Failed to place order");
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({}));
+        showToast(error.error || "Failed to place order", "error");
+        return;
       }
+
+      const order = await res.json();
+      if (isBuyNowCheckout) {
+        clearCheckoutItems();
+      } else {
+        clearCart();
+      }
+      showToast("Order placed successfully.", "success");
+      router.push(`/order-confirmation?orderId=${order.orderId}`);
     } catch {
-      alert("Something went wrong");
+      showToast("Something went wrong", "error");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="bg-white dark:bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-16 lg:py-24">
-        {/* Header */}
-        <h1 className="text-2xl sm:text-3xl md:text-5xl font-black tracking-tight mb-8 md:mb-12">Checkout</h1>
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-16">
+      <div className="mb-10">
+        <p className="section-eyebrow">Checkout</p>
+        <h1 className="section-title">Complete your MATVerse order.</h1>
+      </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 md:gap-12">
-          {/* Checkout Form */}
-          <form onSubmit={handleSubmit} className="lg:col-span-2 space-y-8">
-            {/* Delivery Information */}
-            <div>
-              <h2 className="text-2xl font-bold tracking-tight mb-6">Delivery Information</h2>
+      <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+        <form onSubmit={handleSubmit} className="space-y-8 rounded-[36px] border border-[var(--border)] bg-white/80 p-8 shadow-[var(--shadow-soft)]">
+          {!dbAvailable ? (
+            <div className="rounded-[24px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+              {dbMessage || "Checkout is temporarily unavailable."}
+            </div>
+          ) : null}
 
-              <div className="space-y-6">
-                {/* Full Name */}
-                <div>
-                  <label className="block text-sm font-bold tracking-wide uppercase opacity-60 mb-3">
-                    Full Name *
-                  </label>
+          <div>
+            <h2 className="text-2xl font-semibold">Delivery Information</h2>
+            <div className="mt-6 grid gap-5">
+              <input
+                type="text"
+                required
+                value={form.customerName}
+                onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+                placeholder="Full name"
+                className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-5 py-4 outline-none"
+              />
+              <input
+                type="email"
+                value={form.customerEmail}
+                onChange={(e) => setForm({ ...form, customerEmail: e.target.value })}
+                placeholder="Email address (optional)"
+                className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-5 py-4 outline-none"
+              />
+              <input
+                type="tel"
+                required
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="Phone number"
+                className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-5 py-4 outline-none"
+              />
+              <textarea
+                required
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+                rows={4}
+                placeholder="Delivery address"
+                className="rounded-[22px] border border-[var(--border)] bg-[var(--surface)] px-5 py-4 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-[var(--border)] pt-8">
+            <h2 className="text-2xl font-semibold">Payment Method</h2>
+            <div className="mt-6 grid gap-4">
+              {[
+                { value: "cod", label: "Cash on Delivery", desc: "Pay upon delivery anywhere in Bangladesh" },
+                { value: "bkash", label: "bKash Merchant", desc: "Use merchant payment with OTP verification" },
+                { value: "nagad", label: "Nagad Merchant", desc: "Use merchant payment with OTP verification" },
+              ].map((method) => (
+                <label
+                  key={method.value}
+                  className={`rounded-[24px] border p-5 transition ${
+                    form.paymentMethod === method.value
+                      ? "border-[var(--primary)] bg-[#E8D8C3]/40"
+                      : "border-[var(--border)] bg-[var(--surface)]"
+                  }`}
+                >
                   <input
-                    type="text"
-                    required
-                    value={form.customerName}
-                    onChange={(e) => setForm({ ...form, customerName: e.target.value })}
-                    placeholder="John Doe"
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 px-4 py-3 focus:outline-none focus:border-black dark:focus:border-white transition"
+                    type="radio"
+                    name="paymentMethod"
+                    value={method.value}
+                    checked={form.paymentMethod === method.value}
+                    onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
+                    className="mr-3"
                   />
-                </div>
-
-                {/* Phone Number */}
-                <div>
-                  <label className="block text-sm font-bold tracking-wide uppercase opacity-60 mb-3">
-                    Phone Number *
-                  </label>
-                  <input
-                    type="tel"
-                    required
-                    value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    placeholder="01XXXXXXXXX"
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 px-4 py-3 focus:outline-none focus:border-black dark:focus:border-white transition"
-                  />
-                </div>
-
-                {/* Delivery Address */}
-                <div>
-                  <label className="block text-sm font-bold tracking-wide uppercase opacity-60 mb-3">
-                    Delivery Address *
-                  </label>
-                  <textarea
-                    required
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    rows={4}
-                    placeholder="Enter your full delivery address"
-                    className="w-full bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 px-4 py-3 focus:outline-none focus:border-black dark:focus:border-white transition resize-none"
-                  />
-                </div>
-              </div>
+                  <span className="font-semibold">{method.label}</span>
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">{method.desc}</p>
+                </label>
+              ))}
             </div>
 
-            {/* Payment Method */}
-            <div className="border-t border-gray-200 dark:border-gray-800 pt-8">
-              <h2 className="text-2xl font-bold tracking-tight mb-6">Payment Method</h2>
-
-              <div className="space-y-4">
-                {[
-                  { value: "cod", label: "💵 Cash on Delivery", desc: "Pay when you receive your order" },
-                  { value: "bkash", label: "📱 bKash", desc: "Pay via bKash mobile banking" },
-                  { value: "nagad", label: "📱 Nagad", desc: "Pay via Nagad mobile banking" },
-                ].map((method) => (
-                  <label
-                    key={method.value}
-                    className={`flex items-center p-4 border cursor-pointer transition ${
-                      form.paymentMethod === method.value
-                        ? "border-black dark:border-white bg-gray-50 dark:bg-gray-900"
-                        : "border-gray-300 dark:border-gray-700 hover:border-black dark:hover:border-white"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value={method.value}
-                      checked={form.paymentMethod === method.value}
-                      onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })}
-                      className="mr-4 w-5 h-5 cursor-pointer"
-                    />
-                    <div>
-                      <p className="font-bold">{method.label}</p>
-                      <p className="text-sm opacity-60">{method.desc}</p>
-                    </div>
-                  </label>
-                ))}
+            {isMobilePayment ? (
+              <div className="mt-6 grid gap-4 rounded-[28px] bg-[var(--surface)] p-5">
+                <input
+                  type="text"
+                  required
+                  value={form.mobileWalletNumber}
+                  onChange={(e) => setForm({ ...form, mobileWalletNumber: e.target.value })}
+                  placeholder={`${form.paymentMethod === "bkash" ? "bKash" : "Nagad"} wallet number`}
+                  className="rounded-[20px] border border-[var(--border)] bg-white px-5 py-4 outline-none"
+                />
+                <input
+                  type="text"
+                  value={form.paymentReference}
+                  onChange={(e) => setForm({ ...form, paymentReference: e.target.value })}
+                  placeholder="Transaction reference (optional in sandbox mode)"
+                  className="rounded-[20px] border border-[var(--border)] bg-white px-5 py-4 outline-none"
+                />
+                <input
+                  type="text"
+                  required
+                  value={form.otpCode}
+                  onChange={(e) => setForm({ ...form, otpCode: e.target.value })}
+                  placeholder="OTP verification code"
+                  className="rounded-[20px] border border-[var(--border)] bg-white px-5 py-4 outline-none"
+                />
               </div>
+            ) : null}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !dbAvailable}
+            className="btn-editorial-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Placing Order..." : `Place Order - ${formatCurrency(totalPrice)}`}
+          </button>
+          {loading ? (
+            <p className="text-center text-sm text-[var(--text-secondary)]">
+              Reserving stock and creating your order securely.
+            </p>
+          ) : null}
+        </form>
+
+        <div className="rounded-[36px] border border-[var(--border)] bg-white/80 p-8 shadow-[var(--shadow-soft)]">
+          <h2 className="text-2xl font-semibold">Order Summary</h2>
+
+          <div className="mt-8 space-y-4 border-b border-[var(--border)] pb-8">
+            {lineItems.map((item) => (
+              <div key={item.id} className="flex gap-4">
+                <Image
+                  src={item.image}
+                  alt={item.name}
+                  width={88}
+                  height={88}
+                  sizes="88px"
+                  className="h-20 w-20 rounded-[18px] object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-1 text-sm font-semibold">{item.name}</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)]">
+                    Qty {item.quantity}
+                  </p>
+                  <p className="mt-2 text-sm font-bold">{formatCurrency(item.price * item.quantity)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-8 space-y-4 border-b border-[var(--border)] pb-8 text-sm">
+            <div className="flex justify-between text-[var(--text-secondary)]">
+              <span>Subtotal</span>
+              <span>{formatCurrency(totalPrice)}</span>
             </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-black dark:bg-white text-white dark:text-black py-4 font-bold text-lg tracking-wide hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {loading ? "Placing Order..." : `Place Order - ৳${getTotalPrice().toLocaleString()}`}
-            </button>
-          </form>
-
-          {/* Order Summary Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="border border-gray-200 dark:border-gray-800 p-8 sticky top-24">
-              <h2 className="text-xl font-bold tracking-tight mb-8">Order Summary</h2>
-
-              {/* Items */}
-              <div className="space-y-4 mb-8 pb-8 border-b border-gray-200 dark:border-gray-800">
-                {items.map((item) => (
-                  <div key={item.id} className="flex gap-4">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-16 h-16 object-cover flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold line-clamp-1">{item.name}</p>
-                      <p className="text-xs opacity-60">Qty: {item.quantity}</p>
-                      <p className="text-sm font-bold mt-1">
-                        ৳{(item.price * item.quantity).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Pricing Breakdown */}
-              <div className="space-y-3 mb-8 pb-8 border-b border-gray-200 dark:border-gray-800">
-                <div className="flex justify-between text-sm opacity-60">
-                  <span>Subtotal</span>
-                  <span>৳{getTotalPrice().toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between text-sm opacity-60">
-                  <span>Shipping</span>
-                  <span>Free</span>
-                </div>
-                <div className="flex justify-between text-sm opacity-60">
-                  <span>Tax</span>
-                  <span>Calculated</span>
-                </div>
-              </div>
-
-              {/* Total */}
-              <div className="flex justify-between items-center mb-8">
-                <span className="font-bold">Total</span>
-                <span className="text-3xl font-black">
-                  ৳{getTotalPrice().toLocaleString()}
-                </span>
-              </div>
-
-              {/* Trust Badges */}
-              <div className="space-y-3 text-xs opacity-60 border-t border-gray-200 dark:border-gray-800 pt-6">
-                <p>✓ Secure checkout</p>
-                <p>✓ Order confirmation via SMS</p>
-                <p>✓ Easy returns within 7 days</p>
-              </div>
+            <div className="flex justify-between text-[var(--text-secondary)]">
+              <span>Shipping</span>
+              <span>Calculated at dispatch</span>
             </div>
+            <div className="flex justify-between text-[var(--text-secondary)]">
+              <span>Payment</span>
+              <span className="uppercase">{form.paymentMethod}</span>
+            </div>
+          </div>
+
+          <div className="mt-8 flex items-center justify-between">
+            <span className="text-lg font-semibold">Total</span>
+            <span className="text-3xl font-bold">{formatCurrency(totalPrice)}</span>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-2xl px-4 py-20 text-center">Loading checkout...</div>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }

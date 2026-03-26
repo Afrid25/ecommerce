@@ -12,6 +12,7 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { formatCurrency } from "@/lib/format";
 
 interface DailyData {
   date: string;
@@ -37,7 +38,7 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
 
   if (!hasData) {
     return (
-      <div className="h-64 flex items-center justify-center text-gray-400">
+      <div className="flex h-64 items-center justify-center text-gray-400">
         <p>No sales data available yet</p>
       </div>
     );
@@ -45,13 +46,13 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
 
   return (
     <div>
-      <div className="flex gap-2 mb-4">
+      <div className="mb-4 flex gap-2">
         <button
           onClick={() => setView("daily")}
           className={`px-4 py-1.5 text-sm font-bold tracking-wide transition ${
             view === "daily"
-              ? "bg-black dark:bg-white text-white dark:text-black"
-              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              ? "bg-black text-white dark:bg-white dark:text-black"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           }`}
         >
           Daily
@@ -60,8 +61,8 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
           onClick={() => setView("monthly")}
           className={`px-4 py-1.5 text-sm font-bold tracking-wide transition ${
             view === "monthly"
-              ? "bg-black dark:bg-white text-white dark:text-black"
-              : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+              ? "bg-black text-white dark:bg-white dark:text-black"
+              : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           }`}
         >
           Monthly
@@ -75,11 +76,11 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
             <XAxis
               dataKey="date"
               tick={{ fontSize: 12 }}
-              tickFormatter={(val: string) => val.slice(5)}
+              tickFormatter={(value: string) => value.slice(5)}
             />
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip
-              formatter={(value) => [`৳${Number(value).toLocaleString()}`, "Revenue"]}
+              formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
               labelFormatter={(label) => `Date: ${label}`}
             />
             <Bar dataKey="revenue" fill="#000000" radius={[4, 4, 0, 0]} />
@@ -90,7 +91,7 @@ export default function SalesChart({ dailyRevenue, monthlyRevenue }: Props) {
             <XAxis dataKey="month" tick={{ fontSize: 12 }} />
             <YAxis tick={{ fontSize: 12 }} />
             <Tooltip
-              formatter={(value) => [`৳${Number(value).toLocaleString()}`, "Revenue"]}
+              formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
               labelFormatter={(label) => `Month: ${label}`}
             />
             <Line

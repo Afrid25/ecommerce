@@ -1,21 +1,32 @@
 import { db } from "@/lib/db";
-import { orders, products } from "@/lib/db/schema";
+import { orderItems, orders, products } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth-guards";
+import { ensureCommerceSchema } from "@/lib/commerce";
+import { orderStatusSchema } from "@/lib/validators";
 import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
+import { revalidateTag } from "next/cache";
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const body = await req.json();
-    const { orderStatus } = body;
-
-    const validStatuses = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
-    if (!validStatuses.includes(orderStatus)) {
-      return NextResponse.json({ error: "Invalid order status" }, { status: 400 });
+    const { response } = await requireAdmin();
+    if (response) {
+      return response;
     }
+
+    await ensureCommerceSchema();
+    const { id } = await params;
+    const parsed = orderStatusSchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid order status" },
+        { status: 400 }
+      );
+    }
+    const { orderStatus } = parsed.data;
 
     // Get current order first
     const currentOrder = await db
@@ -38,22 +49,36 @@ export async function PUT(
       return NextResponse.json({ error: "Cannot cancel a delivered order" }, { status: 400 });
     }
 
-    // Restore stock if cancelling
-    if (orderStatus === "cancelled" && order.orderStatus !== "cancelled") {
-      await db
-        .update(products)
-        .set({ stock: sql`${products.stock} + ${order.quantity}` })
-        .where(eq(products.id, order.productId));
-    }
+    const updated = await db.transaction(async (tx) => {
+      if (orderStatus === "cancelled" && order.orderStatus !== "cancelled") {
+        const items = await tx
+          .select({
+            productId: orderItems.productId,
+            quantity: orderItems.quantity,
+          })
+          .from(orderItems)
+          .where(eq(orderItems.orderId, order.id));
 
-    const updated = await db
-      .update(orders)
-      .set({ orderStatus })
-      .where(eq(orders.id, parseInt(id)))
-      .returning();
+        for (const item of items) {
+          await tx
+            .update(products)
+            .set({ stock: sql`${products.stock} + ${item.quantity}` })
+            .where(eq(products.id, item.productId));
+        }
+      }
 
-    return NextResponse.json(updated[0]);
-  } catch (error) {
+      const [nextOrder] = await tx
+        .update(orders)
+        .set({ orderStatus })
+        .where(eq(orders.id, parseInt(id)))
+        .returning();
+
+      return nextOrder;
+    });
+
+    revalidateTag("analytics", "max");
+    return NextResponse.json(updated);
+  } catch {
     return NextResponse.json({ error: "Failed to update order" }, { status: 500 });
   }
 }

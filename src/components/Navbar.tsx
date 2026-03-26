@@ -1,109 +1,106 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { useCartStore } from "@/store/cart";
-import { useState, useEffect } from "react";
+import { useHydrated } from "@/hooks/useHydrated";
+
+const navLinks = [
+  { href: "/shop", label: "Shop" },
+  { href: "/category/bamboo-products", label: "Categories" },
+  { href: "/shop?sort=newest", label: "New Arrivals" },
+  { href: "/shop?sort=price-desc", label: "Top Picks" },
+];
 
 export default function Navbar() {
-  const [mounted, setMounted] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const getTotalItems = useCartStore((s) => s.getTotalItems);
+  const pathname = usePathname();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const mounted = useHydrated();
+  const { resolvedTheme, setTheme } = useTheme();
+  const totalItems = useCartStore((state) => state.getTotalItems());
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 80);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  const onHome = pathname === "/";
+  const darkText = isScrolled || !onHome;
+  const themeText = darkText ? "text-[var(--foreground)]" : "text-white";
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 dark:bg-black/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <Link href="/" className="text-xl font-bold tracking-tight">
-            ShopBD
+    <header
+      className={`fixed left-0 right-0 z-50 transition-all duration-500 ${
+        isScrolled || !onHome
+          ? "top-0 border-b border-[var(--border)] bg-white/90 shadow-lg backdrop-blur-xl dark:bg-black/90"
+          : "top-10 bg-transparent"
+      }`}
+    >
+      <div className="container-nike">
+        <div className="flex h-20 items-center justify-between">
+          <Link href="/" className={`font-display text-4xl leading-none ${themeText}`}>
+            MATVerse
           </Link>
 
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link href="/" className="text-sm font-medium hover:text-gray-600 dark:hover:text-gray-300 transition">
-              Shop
-            </Link>
-            <Link href="/" className="text-sm font-medium hover:text-gray-600 dark:hover:text-gray-300 transition">
-              New Arrivals
-            </Link>
-            <Link href="/" className="text-sm font-medium hover:text-gray-600 dark:hover:text-gray-300 transition">
-              Sale
-            </Link>
-          </div>
+          <nav className="hidden items-center gap-8 lg:flex">
+            {navLinks.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className={`nav-link text-sm font-medium uppercase tracking-[0.18em] ${themeText}`}
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
 
-          {/* Right Section */}
-          <div className="hidden md:flex items-center space-x-6">
-            {/* Cart */}
-            <Link href="/cart" className="relative group">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-              </svg>
-              {mounted && getTotalItems() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {getTotalItems()}
-                </span>
-              )}
-            </Link>
-
-            {/* Admin */}
-            <Link
-              href="/admin"
-              className="text-sm font-medium px-4 py-2 border border-black dark:border-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black transition"
-            >
-              Admin
-            </Link>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center space-x-4">
-            {/* Mobile Cart */}
-            <Link href="/cart" className="relative">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-              </svg>
-              {mounted && getTotalItems() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-black dark:bg-white text-white dark:text-black text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                  {getTotalItems()}
-                </span>
-              )}
-            </Link>
-
-            {/* Hamburger */}
+          <div className="flex items-center gap-3">
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-900 rounded-none"
+              onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              className={`rounded-full p-2 text-sm font-semibold ${themeText}`}
+              aria-label="Toggle theme"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
-              </svg>
+              {mounted ? (resolvedTheme === "dark" ? "Light" : "Dark") : "Theme"}
+            </button>
+            <Link href="/cart" className={`relative rounded-full p-2 text-sm font-semibold ${themeText}`}>
+              Cart
+              {mounted && totalItems > 0 && (
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--primary)] text-[10px] text-white">
+                  {totalItems}
+                </span>
+              )}
+            </Link>
+            <button
+              onClick={() => setMobileOpen((value) => !value)}
+              className={`rounded-full p-2 text-sm font-semibold lg:hidden ${themeText}`}
+              aria-label="Toggle menu"
+            >
+              {mobileOpen ? "Close" : "Menu"}
             </button>
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        <div
-          className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${
-            mobileMenuOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
-          }`}
-        >
-          <div className="border-t border-gray-200 dark:border-gray-800 py-4 space-y-1">
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
-              Shop
-            </Link>
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
-              New Arrivals
-            </Link>
-            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
-              Sale
-            </Link>
-            <Link href="/admin" onClick={() => setMobileMenuOpen(false)} className="block py-3 px-2 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-900 transition">
-              Admin
-            </Link>
+        {mobileOpen && (
+          <div className="border-t border-[var(--border)] bg-white py-4 dark:bg-black lg:hidden">
+            <div className="flex flex-col gap-3">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="px-2 py-2 text-sm font-medium uppercase tracking-[0.18em]"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
-    </nav>
+    </header>
   );
 }

@@ -1,83 +1,185 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
+import { memo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useCartStore } from "@/store/cart";
+import { useToastStore } from "@/store/toast";
+import type { Product } from "@/types/product";
+import { formatCurrency } from "@/lib/format";
 
-interface Product {
-  id: number;
-  name: string;
-  description: string;
-  price: number;
-  image: string;
-  category: string;
-  stock: number;
-}
+type Props = {
+  product?: Product;
+  viewMode?: "grid" | "list";
+};
 
-export default function ProductCard({ product }: { product: Product }) {
-  const addItem = useCartStore((s) => s.addItem);
+function ProductCard({ product, viewMode = "grid" }: Props) {
+  const addItem = useCartStore((state) => state.addItem);
+  const startBuyNow = useCartStore((state) => state.startBuyNow);
+  const showToast = useToastStore((state) => state.showToast);
+  const router = useRouter();
+  const [isAdding, setIsAdding] = useState(false);
+  const [isBuying, setIsBuying] = useState(false);
+
+  if (!product) {
+    return null;
+  }
+
+  const safeImage = product.image || "/images/products/air-max-pulse-1.jpg";
+  const lowStock = product.stock > 0 && product.stock <= 5;
+
+  const handleAddToCart = async (event?: React.MouseEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    if (isAdding || product.stock <= 0) {
+      return;
+    }
+
+    setIsAdding(true);
+    try {
+      addItem({
+        id: Number(product.id),
+        name: product.name,
+        price: product.price,
+        image: safeImage,
+        stock: product.stock,
+      });
+      showToast(`${product.name} added to cart!`, "success");
+    } finally {
+      window.setTimeout(() => setIsAdding(false), 400);
+    }
+  };
+
+  const handleBuyNow = (event?: React.MouseEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    if (isBuying || product.stock <= 0) {
+      return;
+    }
+
+    setIsBuying(true);
+    startBuyNow(
+      {
+        id: Number(product.id),
+        name: product.name,
+        price: product.price,
+        image: safeImage,
+        stock: product.stock,
+      },
+      1
+    );
+    router.push("/checkout?mode=buy-now");
+  };
+
+  if (viewMode === "list") {
+    return (
+      <article className="group overflow-hidden rounded-[1.5rem] bg-[var(--surface)]">
+        <Link href={`/product/${product.id}`} className="flex flex-col sm:flex-row">
+          <div className="relative h-56 w-full overflow-hidden sm:w-56">
+            <Image src={safeImage} alt={product.name} fill className="object-cover transition duration-500 group-hover:scale-110" />
+          </div>
+          <div className="flex flex-1 flex-col justify-between gap-4 p-6 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">{product.category}</p>
+              <h3 className="mt-2 font-display text-3xl leading-none">{product.name}</h3>
+              <p className="mt-3 max-w-xl text-sm text-[var(--text-secondary)]">{product.description}</p>
+            </div>
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              <p className="font-display text-4xl">{formatCurrency(product.price)}</p>
+              <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-2">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={product.stock <= 0}
+                  className="rounded-full border border-[var(--primary)] px-6 py-3 text-sm font-semibold text-[var(--primary)] transition duration-300 hover:bg-[var(--primary)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isAdding ? "Adding..." : "Add to Cart"}
+                </button>
+                <button
+                  onClick={handleBuyNow}
+                  disabled={product.stock <= 0}
+                  className="rounded-full bg-[#D46A46] px-6 py-3 text-sm font-semibold text-white transition duration-300 hover:bg-[#bf5d3c] disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isBuying ? "Redirecting..." : "Buy Now"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Link>
+      </article>
+    );
+  }
 
   return (
-    <div className="group">
-      {/* Image Container */}
-      <Link href={`/product/${product.id}`}>
-        <div className="aspect-square overflow-hidden bg-gray-100 dark:bg-gray-900 mb-4 relative">
-          <img
-            src={product.image}
+    <article className="group overflow-hidden rounded-[1.5rem] bg-[var(--surface)]">
+      <Link href={`/product/${product.id}`} className="block">
+        <div className="relative aspect-square overflow-hidden">
+          <Image
+            src={safeImage}
             alt={product.name}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            fill
+            sizes="(max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            className="object-cover transition duration-500 group-hover:scale-110"
           />
-          {/* Stock Badge */}
-          {product.stock === 0 && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-              <span className="text-white font-bold text-lg">Out of Stock</span>
-            </div>
-          )}
+          <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+            <span className="rounded-full bg-[var(--primary)] px-3 py-1 text-xs font-bold uppercase text-white">
+              Trending
+            </span>
+            {lowStock ? (
+              <span className="rounded-full bg-[#FF6A00] px-3 py-1 text-xs font-bold uppercase text-white">
+                Only {product.stock} left
+              </span>
+            ) : null}
+          </div>
+          <button
+            onClick={handleAddToCart}
+            className="absolute bottom-4 left-4 right-4 translate-y-4 rounded-full bg-[var(--primary)] py-3 font-semibold text-white opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100"
+          >
+            {isAdding ? "Adding..." : "Quick Add"}
+          </button>
         </div>
       </Link>
-
-      {/* Product Info */}
-      <div className="space-y-1 sm:space-y-3">
-        {/* Category */}
-        <span className="text-xs font-bold tracking-widest uppercase opacity-60">
-          {product.category}
-        </span>
-
-        {/* Product Name */}
+      <div className="p-5">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">{product.category}</p>
+          {lowStock ? (
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FF6A00]">
+              Selling fast
+            </span>
+          ) : null}
+        </div>
         <Link href={`/product/${product.id}`}>
-          <h3 className="text-sm font-semibold leading-tight group-hover:opacity-70 transition line-clamp-2">
+          <h3 className="mt-2 font-display text-3xl leading-none transition-colors group-hover:text-[var(--primary)]">
             {product.name}
           </h3>
         </Link>
-
-        {/* Description */}
-        <p className="text-xs opacity-60 line-clamp-1 hidden sm:block">{product.description}</p>
-
-        {/* Price and Stock */}
-        <div className="flex items-center justify-between pt-2">
-          <span className="text-base font-bold">৳{product.price.toLocaleString()}</span>
-          <span className={`text-xs font-medium ${product.stock > 0 ? "opacity-60" : "text-red-600 dark:text-red-400"}`}>
-            {product.stock > 0 ? "In Stock" : "Out of Stock"}
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="font-display text-4xl">{formatCurrency(product.price)}</span>
+          <span className="text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+            {product.stock > 0 ? `${product.stock} left` : "Sold out"}
           </span>
         </div>
-
-        {/* Add to Cart Button */}
-        <button
-          onClick={() =>
-            addItem({
-              id: product.id,
-              name: product.name,
-              price: product.price,
-              image: product.image,
-              stock: product.stock,
-            })
-          }
-          disabled={product.stock === 0}
-          className="w-full mt-2 sm:mt-4 py-2 sm:py-3 bg-black dark:bg-white text-white dark:text-black font-semibold text-xs sm:text-sm hover:opacity-80 disabled:opacity-40 disabled:cursor-not-allowed transition"
-        >
-          {product.stock > 0 ? "Add to Cart" : "Out of Stock"}
-        </button>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <button
+            onClick={handleAddToCart}
+            disabled={product.stock <= 0}
+            className="rounded-full border border-[var(--primary)] px-4 py-3 text-sm font-semibold text-[var(--primary)] transition duration-300 hover:bg-[var(--primary)] hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isAdding ? "Adding..." : "Add to Cart"}
+          </button>
+          <button
+            onClick={handleBuyNow}
+            disabled={product.stock <= 0}
+            className="rounded-full bg-[#D46A46] px-4 py-3 text-sm font-semibold text-white transition duration-300 hover:bg-[#bf5d3c] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isBuying ? "Redirecting..." : "Buy Now"}
+          </button>
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
+
+export default memo(ProductCard);

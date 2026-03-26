@@ -12,10 +12,13 @@ export interface CartItem {
 
 interface CartState {
   items: CartItem[];
+  checkoutItems: CartItem[];
   addItem: (item: Omit<CartItem, "quantity">) => void;
+  startBuyNow: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   removeItem: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
+  clearCheckoutItems: () => void;
   getTotalPrice: () => number;
   getTotalItems: () => number;
 }
@@ -24,6 +27,7 @@ export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
+      checkoutItems: [],
       addItem: (item) => {
         const existing = get().items.find((i) => i.id === item.id);
         if (existing) {
@@ -38,6 +42,15 @@ export const useCartStore = create<CartState>()(
           set({ items: [...get().items, { ...item, quantity: 1 }] });
         }
       },
+      startBuyNow: (item, quantity = 1) =>
+        set({
+          checkoutItems: [
+            {
+              ...item,
+              quantity: Math.max(1, Math.min(quantity, item.stock)),
+            },
+          ],
+        }),
       removeItem: (id) => {
         set({ items: get().items.filter((i) => i.id !== id) });
       },
@@ -53,6 +66,7 @@ export const useCartStore = create<CartState>()(
         }
       },
       clearCart: () => set({ items: [] }),
+      clearCheckoutItems: () => set({ checkoutItems: [] }),
       getTotalPrice: () =>
         get().items.reduce((total, item) => total + item.price * item.quantity, 0),
       getTotalItems: () =>
