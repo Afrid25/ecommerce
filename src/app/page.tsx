@@ -5,6 +5,10 @@ import ProductLoopSection from "@/components/ProductLoopSection";
 import { getCatalog } from "@/lib/catalog";
 import { campaignOffers, testimonials } from "@/lib/site-content";
 
+// app/page.tsx বা যে page update করতে চাইছো
+export const revalidate = 0;           // ISR reset
+// অথবা
+export const dynamic = "force-dynamic"; // Always render fresh
 export default async function HomePage() {
   const catalog = await getCatalog({ sort: "popular", pageSize: 12 });
   const trending = catalog.items.slice(0, 6);
