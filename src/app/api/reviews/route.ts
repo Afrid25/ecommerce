@@ -3,7 +3,7 @@ import { db, isDatabaseConfigured } from "@/lib/db";
 import { reviews } from "@/lib/db/schema";
 import { ensureCommerceSchema } from "@/lib/commerce";
 import { requireAdmin } from "@/lib/auth-guards";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,17 +17,20 @@ export async function GET(req: NextRequest) {
     const productId = searchParams.get("productId");
     const status = searchParams.get("status");
 
-    let query = db.select().from(reviews).orderBy(desc(reviews.createdAt)).$dynamic();
-
+    const conditions = [];
     if (productId) {
-      query = query.where(eq(reviews.productId, parseInt(productId)));
+      conditions.push(eq(reviews.productId, parseInt(productId)));
     }
-
     if (status) {
-      query = query.where(eq(reviews.status, status));
+      conditions.push(eq(reviews.status, status));
     }
 
-    const result = await query;
+    const result = await db
+      .select()
+      .from(reviews)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(reviews.createdAt));
+
     return NextResponse.json(result);
   } catch (error) {
     console.error("Reviews fetch error:", error);
