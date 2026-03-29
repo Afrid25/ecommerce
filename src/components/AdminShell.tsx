@@ -16,6 +16,10 @@ const navItems = [
   { href: "/admin/products", label: "Products" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/offers", label: "Offers" },
+  { href: "/admin/homepage", label: "Homepage" },
+  { href: "/admin/reviews", label: "Reviews" },
+  { href: "/admin/settings", label: "Settings" },
 ];
 
 export default function AdminShell({ title, subtitle, actions, children }: Props) {
