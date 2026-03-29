@@ -97,6 +97,44 @@ export async function ensureCommerceSchema() {
       ADD COLUMN IF NOT EXISTS product_image text DEFAULT '';
     `);
 
+    // Create reviews table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reviews (
+        id serial PRIMARY KEY,
+        product_id integer NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        customer_name text NOT NULL,
+        rating integer NOT NULL,
+        comment text NOT NULL,
+        status text NOT NULL DEFAULT 'pending',
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    // Create offers table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS offers (
+        id serial PRIMARY KEY,
+        title text NOT NULL,
+        description text NOT NULL,
+        discount_percent integer NOT NULL DEFAULT 0,
+        product_ids text NOT NULL DEFAULT '[]',
+        active boolean NOT NULL DEFAULT true,
+        starts_at timestamp,
+        expires_at timestamp,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    // Create site_settings table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS site_settings (
+        id serial PRIMARY KEY,
+        key text NOT NULL UNIQUE,
+        value text NOT NULL DEFAULT '',
+        updated_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
     for (const category of categoryDefinitions) {
       await db.execute(sql`
         INSERT INTO categories (id, name, slug, image, description)

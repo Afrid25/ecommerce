@@ -1,6 +1,11 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { Pool } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 import * as schema from "./schema";
+
+// Enable WebSocket for serverless environments
+import { neonConfig } from "@neondatabase/serverless";
+neonConfig.webSocketConstructor = ws;
 
 export class MissingDatabaseUrlError extends Error {
   constructor() {
@@ -11,6 +16,7 @@ export class MissingDatabaseUrlError extends Error {
   }
 }
 
+let poolInstance: Pool | null = null;
 let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
 
 export function isDatabaseConfigured() {
@@ -23,8 +29,8 @@ export function getDb() {
   }
 
   if (!dbInstance) {
-    const sql = neon(process.env.DATABASE_URL!.trim());
-    dbInstance = drizzle(sql, { schema });
+    poolInstance = new Pool({ connectionString: process.env.DATABASE_URL!.trim() });
+    dbInstance = drizzle(poolInstance, { schema });
   }
 
   return dbInstance;

@@ -16,8 +16,6 @@ function CheckoutContent() {
   const { items, checkoutItems, clearCart, clearCheckoutItems } = useCartStore();
   const showToast = useToastStore((state) => state.showToast);
   const [loading, setLoading] = useState(false);
-  const [dbAvailable, setDbAvailable] = useState(true);
-  const [dbMessage, setDbMessage] = useState("");
   const [form, setForm] = useState({
     customerName: "",
     customerEmail: "",
@@ -33,28 +31,7 @@ function CheckoutContent() {
   const lineItems = isBuyNowCheckout && checkoutItems.length > 0 ? checkoutItems : items;
   const totalPrice = lineItems.reduce((total, item) => total + item.price * item.quantity, 0);
 
-  useEffect(() => {
-    const checkAvailability = async () => {
-      try {
-        const res = await fetch("/api/place-order", { method: "GET", cache: "no-store" });
-        const data = await res.json().catch(() => null);
-
-        if (!res.ok || !data?.available) {
-          setDbAvailable(false);
-          setDbMessage(data?.error || "Checkout is temporarily unavailable.");
-          return;
-        }
-
-        setDbAvailable(true);
-        setDbMessage("");
-      } catch {
-        setDbAvailable(false);
-        setDbMessage("Checkout is temporarily unavailable.");
-      }
-    };
-
-    checkAvailability();
-  }, []);
+  // DB availability check removed per Phase 1 — errors handled on submit only
 
   if (!mounted) {
     return null;
@@ -75,11 +52,6 @@ function CheckoutContent() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-
-    if (!dbAvailable) {
-      showToast(dbMessage || "Checkout is temporarily unavailable.", "error");
-      return;
-    }
 
     setLoading(true);
 
@@ -127,11 +99,6 @@ function CheckoutContent() {
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <form onSubmit={handleSubmit} className="space-y-8 rounded-[36px] border border-[var(--border)] bg-white/80 p-8 shadow-[var(--shadow-soft)]">
-          {!dbAvailable ? (
-            <div className="rounded-[24px] border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-              {dbMessage || "Checkout is temporarily unavailable."}
-            </div>
-          ) : null}
 
           <div>
             <h2 className="text-2xl font-semibold">Delivery Information</h2>
@@ -231,7 +198,7 @@ function CheckoutContent() {
 
           <button
             type="submit"
-            disabled={loading || !dbAvailable}
+            disabled={loading}
             className="btn-editorial-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? "Placing Order..." : `Place Order - ${formatCurrency(totalPrice)}`}

@@ -115,3 +115,34 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  customerName: text("customer_name").notNull(),
+  rating: integer("rating").notNull(),
+  comment: text("comment").notNull(),
+  status: text("status").notNull().default("pending"), // pending, approved, rejected
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  productIdx: index("reviews_product_idx").on(table.productId),
+  statusIdx: index("reviews_status_idx").on(table.status),
+}));
+
+export const offers = pgTable("offers", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  discountPercent: integer("discount_percent").notNull().default(0),
+  productIds: text("product_ids").notNull().default("[]"), // JSON array of product IDs
+  active: boolean("active").notNull().default(true),
+  startsAt: timestamp("starts_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull().default(""),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
