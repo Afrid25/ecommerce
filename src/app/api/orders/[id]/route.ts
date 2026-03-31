@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 
-export async function PUT(
+async function updateOrderStatus(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -79,6 +79,20 @@ export async function PUT(
     revalidateTag("analytics", "max");
     return NextResponse.json(updated);
   } catch {
-    return NextResponse.json({ error: "Failed to update order" }, { status: 500 });
+      return NextResponse.json({ error: "Failed to update order" }, { status: 500 });
   }
+}
+
+export async function PUT(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  return updateOrderStatus(req, context);
+}
+
+export async function PATCH(
+  req: NextRequest,
+  context: { params: Promise<{ id: string }> }
+) {
+  return updateOrderStatus(req, context);
 }

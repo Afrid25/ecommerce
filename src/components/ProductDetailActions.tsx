@@ -24,6 +24,7 @@ export default function ProductDetailActions({ product }: Props) {
         id: Number(product.id),
         name: product.name,
         price: product.price,
+        compareAtPrice: product.compareAtPrice,
         image: product.image,
         stock: product.stock,
       });
@@ -38,6 +39,7 @@ export default function ProductDetailActions({ product }: Props) {
         id: Number(product.id),
         name: product.name,
         price: product.price,
+        compareAtPrice: product.compareAtPrice,
         image: product.image,
         stock: product.stock,
       },
@@ -58,9 +60,9 @@ export default function ProductDetailActions({ product }: Props) {
           : "Ready to ship with secure checkout and live inventory updates."}
       </div>
 
-      <div className="flex items-center space-x-4">
+      <div className="flex flex-wrap items-center gap-4">
         <span className="text-sm font-bold uppercase tracking-wide opacity-60">Quantity:</span>
-        <div className="flex items-center border border-gray-300 dark:border-gray-700">
+        <div className="flex max-w-full items-center overflow-hidden border border-gray-300 dark:border-gray-700">
           <button
             onClick={() => setQuantity(Math.max(1, quantity - 1))}
             className="px-4 py-3 font-semibold transition hover:bg-gray-100 dark:hover:bg-gray-900"
@@ -79,7 +81,7 @@ export default function ProductDetailActions({ product }: Props) {
         </div>
       </div>
 
-      <div className="hidden gap-3 md:grid-cols-2 md:grid">
+      <div className="hidden gap-3 md:grid md:grid-cols-2">
         <button
           onClick={handleAddToCart}
           className="w-full rounded-full border border-[var(--primary)] px-8 py-4 text-lg font-bold tracking-wide text-[var(--primary)] transition-all duration-300 hover:bg-[var(--primary)] hover:text-white"
@@ -105,13 +107,13 @@ export default function ProductDetailActions({ product }: Props) {
         <div className="mx-auto flex max-w-7xl items-center gap-3">
           <button
             onClick={handleAddToCart}
-            className="flex-1 rounded-full border border-[var(--primary)] px-4 py-3 text-sm font-semibold text-[var(--primary)]"
+            className="min-w-0 flex-1 rounded-full border border-[var(--primary)] px-4 py-3 text-sm font-semibold text-[var(--primary)]"
           >
             Add to Cart
           </button>
           <button
             onClick={handleBuyNow}
-            className="flex-1 rounded-full bg-[#FF6A00] px-4 py-3 text-sm font-semibold text-white"
+            className="min-w-0 flex-1 rounded-full bg-[#FF6A00] px-4 py-3 text-sm font-semibold text-white"
           >
             Buy Now
           </button>

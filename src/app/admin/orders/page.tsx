@@ -28,7 +28,7 @@ type OrderRecord = {
   items: OrderItem[];
 };
 
-const statuses = ["pending", "confirmed", "shipped", "delivered", "cancelled"];
+const statuses = ["pending_payment", "pending", "processing", "confirmed", "shipped", "delivered", "cancelled"];
 
 export default function AdminOrdersPage() {
   const { data: session, isPending } = useSession();

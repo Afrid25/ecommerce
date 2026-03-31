@@ -1,0 +1,30 @@
+<svg width="220" height="72" viewBox="0 0 220 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="mat-blue" x1="17" y1="13" x2="79" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1F5B96"/>
+      <stop offset="1" stop-color="#0E3154"/>
+    </linearGradient>
+    <linearGradient id="mat-orange" x1="82" y1="12" x2="112" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8BE43"/>
+      <stop offset="1" stop-color="#F07B16"/>
+    </linearGradient>
+    <linearGradient id="mat-green" x1="127" y1="14" x2="178" y2="56" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#40C35A"/>
+      <stop offset="1" stop-color="#178C48"/>
+    </linearGradient>
+    <linearGradient id="mat-wave" x1="24" y1="44" x2="192" y2="63" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#115B99"/>
+      <stop offset="0.55" stop-color="#1AA19C"/>
+      <stop offset="1" stop-color="#38C172"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 55L30 13L49 31L73 13L64 56H50L54 38L42 46L34 39L29 56H18Z" fill="url(#mat-blue)"/>
+  <path d="M80 42L103 12L126 42H111L103 31L95 42H80Z" fill="url(#mat-orange)"/>
+  <path d="M133 14H187L181 28H167L160 56H145L152 28H139L133 14Z" fill="url(#mat-green)"/>
+  <path d="M10 63C37 47 79 41 118 41C149 41 179 45 204 53C184 63 156 69 115 69C75 69 39 67 10 63Z" fill="url(#mat-wave)"/>
+  <path d="M29 70V49H38L46 63L54 49H63V70H54V60L47 70H44L38 60V70H29Z" fill="#0E3154"/>
+  <path d="M67 70L76 49H87L96 70H86L85 66H77L76 70H67ZM79 59H84L81 53L79 59Z" fill="#0E3154"/>
+  <path d="M100 49H129V57H119V70H110V57H100V49Z" fill="#0E3154"/>
+  <path d="M130 49H140L148 63L157 49H166L152 70H144L130 49Z" fill="#178C48"/>
+  <path d="M168 49H192C201 49 206 53 206 59C206 66 200 70 190 70H168V49ZM177 56V63H189C193 63 196 62 196 59C196 57 194 56 189 56H177Z" fill="#178C48"/>
+</svg>

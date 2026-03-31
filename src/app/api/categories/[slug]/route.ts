@@ -9,7 +9,7 @@ import { z } from "zod";
 
 const categorySchema = z.object({
   name: z.string().trim().min(1, "Name is required"),
-  slug: z.string().trim().min(1, "Slug is required").optional(),
+  slug: z.union([z.string().trim().min(1, "Slug is required"), z.literal("")]).optional(),
   image: z.string().trim().min(1, "Image is required"),
   description: z.string().trim().min(1, "Description is required"),
 });

@@ -1,0 +1,226 @@
+import { importedSampleProducts } from "@/lib/sample-products";
+
+export type SeededProduct = {
+  name: string;
+  description: string;
+  price: number;
+  compareAtPrice?: number;
+  costPrice: number;
+  image: string;
+  category: string;
+  categorySlug: string;
+  stock: number;
+  isFeatured?: boolean;
+  isTrending?: boolean;
+  isHot?: boolean;
+  isLimited?: boolean;
+};
+
+const coreSeededProducts: SeededProduct[] = [
+  {
+    name: "Bamboo Cutlery Set",
+    description: "Reusable bamboo fork, spoon, knife, and straw set designed for daily eco-friendly dining.",
+    price: 1200,
+    compareAtPrice: 1450,
+    costPrice: 620,
+    image: "/images/matverse/product_bamboo_cutlery.jpg",
+    category: "Bamboo Products",
+    categorySlug: "bamboo-products",
+    stock: 18,
+    isFeatured: true,
+    isTrending: true,
+  },
+  {
+    name: "Oak Floating Shelf",
+    description: "Solid oak wall shelf with minimalist brackets to display books, ceramics, and decor.",
+    price: 5400,
+    costPrice: 3100,
+    image: "/images/matverse/product_oak_shelf.jpg",
+    category: "Wooden Decor",
+    categorySlug: "wooden-decor",
+    stock: 7,
+    isFeatured: true,
+  },
+  {
+    name: "Woven Storage Basket",
+    description: "Handwoven natural fiber basket for stylish storage in living rooms, bedrooms, and entryways.",
+    price: 2300,
+    compareAtPrice: 2600,
+    costPrice: 1180,
+    image: "/images/matverse/product_woven_basket.jpg",
+    category: "Handmade Crafts",
+    categorySlug: "handmade-crafts",
+    stock: 9,
+    isTrending: true,
+  },
+  {
+    name: "Bamboo Utensil Holder",
+    description: "Countertop bamboo organizer that keeps wooden spoons and kitchen tools neatly in reach.",
+    price: 1450,
+    costPrice: 720,
+    image: "/images/matverse/product_utensil_holder.jpg",
+    category: "Eco Lifestyle",
+    categorySlug: "eco-lifestyle",
+    stock: 11,
+  },
+  {
+    name: "Organic Cotton Overshirt",
+    description: "Relaxed-fit overshirt made with breathable organic cotton and soft natural dye.",
+    price: 3200,
+    compareAtPrice: 3600,
+    costPrice: 1700,
+    image: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=1200&auto=format&fit=crop&q=80",
+    category: "Cloths / Fashion",
+    categorySlug: "cloths-fashion",
+    stock: 14,
+    isHot: true,
+  },
+  {
+    name: "Cork Travel Wallet",
+    description: "Slim vegan wallet built with cork leather for cards, cash, and travel documents.",
+    price: 1800,
+    costPrice: 920,
+    image: "https://images.unsplash.com/photo-1523170335258-f5ed11844a49?w=1200&auto=format&fit=crop&q=80",
+    category: "Accessories",
+    categorySlug: "accessories",
+    stock: 22,
+  },
+  {
+    name: "Solar Power Bank",
+    description: "Portable backup charger with solar-assisted top-up for travel, emergencies, and daily carry.",
+    price: 4200,
+    compareAtPrice: 4800,
+    costPrice: 2500,
+    image: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1200&auto=format&fit=crop&q=80",
+    category: "Electronics",
+    categorySlug: "electronics",
+    stock: 5,
+    isLimited: true,
+    isTrending: true,
+  },
+  {
+    name: "Hand-Carved Serving Board",
+    description: "Mango-wood serving board carved and finished by artisans for elevated hosting moments.",
+    price: 2600,
+    costPrice: 1460,
+    image: "https://images.unsplash.com/photo-1549187774-b4e9b0445b41?w=1200&auto=format&fit=crop&q=80",
+    category: "Handmade Crafts",
+    categorySlug: "handmade-crafts",
+    stock: 6,
+    isLimited: true,
+  },
+  {
+    name: "Bamboo Desk Organizer",
+    description: "A clean-lined organizer tray for pens, notes, chargers, and small desktop essentials.",
+    price: 1900,
+    costPrice: 970,
+    image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=1200&auto=format&fit=crop&q=80",
+    category: "Bamboo Products",
+    categorySlug: "bamboo-products",
+    stock: 13,
+  },
+  {
+    name: "Walnut Accent Mirror",
+    description: "Rounded mirror framed in walnut wood to warm up compact corners and hallways.",
+    price: 6400,
+    costPrice: 3650,
+    image: "https://images.unsplash.com/photo-1616628182509-6f0af44d0da0?w=1200&auto=format&fit=crop&q=80",
+    category: "Wooden Decor",
+    categorySlug: "wooden-decor",
+    stock: 4,
+    isLimited: true,
+    isHot: true,
+  },
+  {
+    name: "Refillable Glass Cleaner Kit",
+    description: "Reusable spray bottle with plant-based cleaning tablets for a lower-waste routine.",
+    price: 950,
+    costPrice: 410,
+    image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=1200&auto=format&fit=crop&q=80",
+    category: "Eco Lifestyle",
+    categorySlug: "eco-lifestyle",
+    stock: 25,
+  },
+  {
+    name: "Linen Everyday Tote",
+    description: "Soft structured tote crafted from linen blend fabric for markets, errands, and gifting.",
+    price: 1450,
+    compareAtPrice: 1700,
+    costPrice: 760,
+    image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=1200&auto=format&fit=crop&q=80",
+    category: "Cloths / Fashion",
+    categorySlug: "cloths-fashion",
+    stock: 16,
+  },
+  {
+    name: "Teak Corner Stool",
+    description: "Compact teak stool that doubles as a side table for books, plants, or tea trays.",
+    price: 3900,
+    costPrice: 2150,
+    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&auto=format&fit=crop&q=80",
+    category: "Wooden Decor",
+    categorySlug: "wooden-decor",
+    stock: 8,
+    isFeatured: true,
+  },
+  {
+    name: "Jute Storage Runner",
+    description: "Natural jute runner that softens entryways and kitchens with earthy texture.",
+    price: 2100,
+    costPrice: 1100,
+    image: "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1200&auto=format&fit=crop&q=80",
+    category: "Eco Lifestyle",
+    categorySlug: "eco-lifestyle",
+    stock: 12,
+  },
+  {
+    name: "Ceramic Tea Ritual Set",
+    description: "Minimal ceramic cup and teapot set for calm evening tea and gifting.",
+    price: 2800,
+    compareAtPrice: 3200,
+    costPrice: 1490,
+    image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1200&auto=format&fit=crop&q=80",
+    category: "Accessories",
+    categorySlug: "accessories",
+    stock: 10,
+    isHot: true,
+  },
+  {
+    name: "Bamboo Counter Tray",
+    description: "Slim bamboo tray to organize oils, spices, or bathroom essentials with a cleaner look.",
+    price: 1650,
+    costPrice: 840,
+    image: "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?w=1200&auto=format&fit=crop&q=80",
+    category: "Bamboo Products",
+    categorySlug: "bamboo-products",
+    stock: 15,
+  },
+];
+
+export const seededProducts: SeededProduct[] = [...coreSeededProducts, ...importedSampleProducts];
+
+export const defaultHomepageSettings = {
+  heroTitle: "Design to Elevate Your Space",
+  heroSubtitle: "Minimal bamboo, wood, and low-waste essentials curated for calm modern homes.",
+  heroImage: "/images/matverse/interior_scene_collage.jpg",
+  heroCtaText: "Shop Now",
+  bannerText: "Luxury-feel mobile commerce with real stock, real checkout, and admin-controlled campaigns.",
+  featuredProductIds: "",
+};
+
+export const defaultSiteSettings = {
+  businessEmail: "matversebd@gmail.com",
+  phone: "+880 1712-345678",
+  address: "Dhaka, Bangladesh",
+  facebook: "https://facebook.com",
+  instagram: "https://instagram.com",
+  whatsappNumber: "8801712345678",
+  messengerLink: "https://m.me",
+  supportEmail: "matversebd@gmail.com",
+  supportHours: "10:00 AM - 10:00 PM, every day",
+  footerContent: "Premium, mobile-first commerce for eco lifestyle essentials.",
+  primaryColor: "#ff6a00",
+  accentColor: "#ff6a00",
+  backgroundColor: "#ffffff",
+  buttonStyle: "pill",
+};

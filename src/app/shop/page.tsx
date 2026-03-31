@@ -118,7 +118,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               <p className="text-sm text-[var(--text-secondary)]">{catalog.pagination.totalItems} products found</p>
               <p className="text-sm text-[var(--text-secondary)]">Page {catalog.pagination.page} of {catalog.pagination.totalPages}</p>
             </div>
-            <div className={`grid gap-6 ${view === "grid" ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"}`}>
+            <div className={`grid ${view === "grid" ? "grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 gap-6"}`}>
               {catalog.items.map((product) => (
                 <ProductCard key={product.id} product={product} viewMode={view} />
               ))}

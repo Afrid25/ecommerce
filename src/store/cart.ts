@@ -5,6 +5,7 @@ export interface CartItem {
   id: number;
   name: string;
   price: number;
+  compareAtPrice?: number | null;
   image: string;
   quantity: number;
   stock: number;
@@ -13,12 +14,15 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   checkoutItems: CartItem[];
+  wishlist: Omit<CartItem, "quantity">[];
   addItem: (item: Omit<CartItem, "quantity">) => void;
   startBuyNow: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   removeItem: (id: number) => void;
   updateQuantity: (id: number, quantity: number) => void;
   clearCart: () => void;
   clearCheckoutItems: () => void;
+  toggleWishlist: (item: Omit<CartItem, "quantity">) => void;
+  isWishlisted: (id: number) => boolean;
   getTotalPrice: () => number;
   getTotalItems: () => number;
 }
@@ -28,6 +32,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       checkoutItems: [],
+      wishlist: [],
       addItem: (item) => {
         const existing = get().items.find((i) => i.id === item.id);
         if (existing) {
@@ -67,6 +72,15 @@ export const useCartStore = create<CartState>()(
       },
       clearCart: () => set({ items: [] }),
       clearCheckoutItems: () => set({ checkoutItems: [] }),
+      toggleWishlist: (item) => {
+        const exists = get().wishlist.some((entry) => entry.id === item.id);
+        set({
+          wishlist: exists
+            ? get().wishlist.filter((entry) => entry.id !== item.id)
+            : [...get().wishlist, item],
+        });
+      },
+      isWishlisted: (id) => get().wishlist.some((item) => item.id === id),
       getTotalPrice: () =>
         get().items.reduce((total, item) => total + item.price * item.quantity, 0),
       getTotalItems: () =>

@@ -3,13 +3,14 @@ import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import ProductLoopSection from "@/components/ProductLoopSection";
 import { getCatalog } from "@/lib/catalog";
+import { getHomepageSettings } from "@/lib/commerce";
 import { campaignOffers, testimonials } from "@/lib/site-content";
 
-// app/page.tsx বা যে page update করতে চাইছো
+
 export const revalidate = 0;           // ISR reset
-// অথবা
 export const dynamic = "force-dynamic"; // Always render fresh
 export default async function HomePage() {
+  const homepage = await getHomepageSettings();
   const catalog = await getCatalog({ sort: "popular", pageSize: 12 });
   const trending = catalog.items.slice(0, 6);
   const recommended = catalog.items.slice(6, 12);
@@ -18,24 +19,25 @@ export default async function HomePage() {
   return (
     <div className="bg-[var(--background)]">
       <section className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(107,142,35,0.28),_transparent_34%),linear-gradient(135deg,#16311a_0%,#0f2213_42%,#f5e6d3_42%,#fff8f1_100%)]">
+        <div className="absolute inset-0">
+          <Image src={homepage.heroImage} alt="MATVerse hero" fill priority className="object-cover opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/20 to-transparent" />
+        </div>
         <div className="container-nike relative grid min-h-[92vh] items-center gap-12 py-28 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="relative z-10 max-w-2xl">
             <p className="mb-5 inline-flex rounded-full bg-white/12 px-4 py-2 text-xs font-semibold uppercase tracking-[0.24em] text-white ring-1 ring-white/20">
               Eco modern commerce experience
             </p>
             <h1 className="font-display text-6xl leading-[0.88] text-white sm:text-7xl lg:text-8xl">
-              Sustainable design
-              <span className="block text-[#F5E6D3]">that feels worth buying.</span>
+              <i>MATVERSE</i>
+              <span className="block text-[#F5E6D3]">{homepage.heroTitle}</span>
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-8 text-white/78">
-              MATVerse blends premium craft, eco-conscious materials, and a cleaner buying journey so visitors stay longer and convert with confidence.
+            <p className="mt-6 max-w-xl text-base leading-8 text-white/80">
+              {homepage.heroSubtitle}
             </p>
             <div className="mt-10 flex flex-wrap gap-4">
               <Link href="/shop" className="btn-primary bg-[#FF6A00] hover:bg-[#e25f00]">
-                Shop Now
-              </Link>
-              <Link href="/category/bamboo-products" className="btn-editorial-secondary border-white text-white">
-                Explore Categories
+                {homepage.heroCtaText}
               </Link>
             </div>
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
@@ -56,7 +58,7 @@ export default async function HomePage() {
             <div className="absolute inset-x-8 top-6 hidden h-72 rounded-[3rem] bg-[#6B8E23]/20 blur-3xl lg:block" />
             <div className="absolute left-0 top-14 w-[52%] rotate-[-8deg] rounded-[2.5rem] border border-white/15 bg-white/12 p-4 shadow-2xl backdrop-blur animate-float">
               <div className="relative aspect-[4/5] overflow-hidden rounded-[2rem]">
-                <Image src="/images/matverse/product_bamboo_cutlery.jpg" alt="Bamboo products" fill className="object-cover" priority />
+                <Image src={homepage.heroImage} alt="MATVerse collection" fill className="object-cover" priority />
               </div>
             </div>
             <div className="absolute right-0 top-0 w-[58%] rounded-[2.5rem] border border-[#d7c2ab] bg-[#fff9f2] p-4 shadow-2xl animate-float-delay">
@@ -117,7 +119,7 @@ export default async function HomePage() {
               View All
             </Link>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {trending.map((product) => (
               <ProductCard key={product.id} product={product} />
             ))}
@@ -167,7 +169,7 @@ export default async function HomePage() {
           <div className="rounded-[2.5rem] bg-[linear-gradient(135deg,#6B8E23_0%,#375012_45%,#1c2d0c_100%)] px-8 py-12 text-white md:px-12">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/70">Final CTA</p>
             <h2 className="mt-4 max-w-3xl text-4xl font-semibold leading-tight md:text-5xl">
-              Make the storefront feel premium, trustworthy, and impossible to abandon halfway.
+              {homepage.bannerText}
             </h2>
             <div className="mt-8 flex flex-wrap gap-4">
               <Link href="/shop" className="rounded-full bg-white px-6 py-3 font-semibold text-[#1c2d0c]">
@@ -183,3 +185,5 @@ export default async function HomePage() {
     </div>
   );
 }
+
+

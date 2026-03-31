@@ -62,7 +62,19 @@ export async function PUT(
       );
     }
 
-    const { name, description, price, image, stock } = parsed.data;
+    const {
+      name,
+      description,
+      price,
+      compareAtPrice,
+      costPrice,
+      image,
+      stock,
+      isFeatured,
+      isTrending,
+      isHot,
+      isLimited,
+    } = parsed.data;
     const categories = await getCategoryRecords();
     const matchedCategory = categories.find((entry) => entry.slug === parsed.data.categorySlug);
 
@@ -76,10 +88,16 @@ export async function PUT(
         name: name.trim(),
         description: description.trim(),
         price,
+        compareAtPrice: compareAtPrice ?? null,
+        costPrice,
         image: image.trim(),
         category: matchedCategory.name,
         categorySlug: matchedCategory.slug,
         stock,
+        isFeatured,
+        isTrending,
+        isHot,
+        isLimited,
       })
       .where(eq(products.id, parseInt(id)))
       .returning();

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
+import Logo from "@/components/Logo";
 import { useCartStore } from "@/store/cart";
 import { useHydrated } from "@/hooks/useHydrated";
 
@@ -29,8 +30,13 @@ export default function Navbar() {
   }, []);
 
   const onHome = pathname === "/";
+  const onAdmin = pathname.startsWith("/admin");
   const darkText = isScrolled || !onHome;
   const themeText = darkText ? "text-[var(--foreground)]" : "text-white";
+
+  if (onAdmin) {
+    return null;
+  }
 
   return (
     <header
@@ -42,9 +48,7 @@ export default function Navbar() {
     >
       <div className="container-nike">
         <div className="flex h-20 items-center justify-between">
-          <Link href="/" className={`font-display text-4xl leading-none ${themeText}`}>
-            MATVerse
-          </Link>
+          <Logo href="/" className={darkText ? "" : "brightness-[1.12] saturate-110"} priority />
 
           <nav className="hidden items-center gap-8 lg:flex">
             {navLinks.map((link) => (
@@ -66,6 +70,9 @@ export default function Navbar() {
             >
               {mounted ? (resolvedTheme === "dark" ? "Light" : "Dark") : "Theme"}
             </button>
+            <Link href="/profile" className={`rounded-full p-2 text-sm font-semibold ${themeText}`}>
+              Profile
+            </Link>
             <Link href="/cart" className={`relative rounded-full p-2 text-sm font-semibold ${themeText}`}>
               Cart
               {mounted && totalItems > 0 && (
@@ -97,6 +104,9 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
+              <Link href="/profile" onClick={() => setMobileOpen(false)} className="px-2 py-2 text-sm font-medium uppercase tracking-[0.18em]">
+                Profile
+              </Link>
             </div>
           </div>
         )}

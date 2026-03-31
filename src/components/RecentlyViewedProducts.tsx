@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useHydrated } from "@/hooks/useHydrated";
 import ProductCard from "@/components/ProductCard";
 import type { Product } from "@/types/product";
 
@@ -9,15 +9,14 @@ type Props = {
 };
 
 export default function RecentlyViewedProducts({ currentProductId }: Props) {
-  const [items] = useState<Product[]>(() => {
-    if (typeof window === "undefined") {
-      return [];
-    }
-
-    const stored = window.localStorage.getItem("recently-viewed-products");
-    const parsed = stored ? (JSON.parse(stored) as Product[]) : [];
-    return parsed.filter((item) => Number(item.id) !== Number(currentProductId)).slice(0, 4);
-  });
+  const mounted = useHydrated();
+  const items = mounted
+    ? (() => {
+        const stored = window.localStorage.getItem("recently-viewed-products");
+        const parsed = stored ? (JSON.parse(stored) as Product[]) : [];
+        return parsed.filter((item) => Number(item.id) !== Number(currentProductId)).slice(0, 4);
+      })()
+    : [];
 
   if (items.length === 0) {
     return null;
@@ -29,7 +28,7 @@ export default function RecentlyViewedProducts({ currentProductId }: Props) {
         <p className="section-eyebrow">Recently Viewed</p>
         <h2 className="section-title">Pick up where you left off.</h2>
       </div>
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {items.map((product) => (
           <ProductCard key={product.id} product={product} />
         ))}

@@ -10,6 +10,7 @@ const getCachedAnalytics = unstable_cache(
   async () => {
     await ensureCommerceSchema();
     let totalRevenue = 0;
+    let totalProfit = 0;
     try {
       const revenueResult = await db
         .select({ total: sql<number>`COALESCE(SUM(${orders.totalPrice}), 0)` })
@@ -20,12 +21,33 @@ const getCachedAnalytics = unstable_cache(
       console.error("Failed to fetch total revenue:", err);
     }
 
+    try {
+      const profitResult = await db
+        .select({ total: sql<number>`COALESCE(SUM(${orders.profit}), 0)` })
+        .from(orders)
+        .where(sql`${orders.orderStatus} != 'cancelled'`);
+      totalProfit = profitResult[0]?.total || 0;
+    } catch (err) {
+      console.error("Failed to fetch total profit:", err);
+    }
+
     let totalOrders = 0;
+    let pendingOrders = 0;
     try {
       const ordersCount = await db.select({ count: sql<number>`COUNT(*)` }).from(orders);
       totalOrders = ordersCount[0]?.count || 0;
     } catch (err) {
       console.error("Failed to fetch total orders:", err);
+    }
+
+    try {
+      const pendingCount = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(orders)
+        .where(sql`${orders.orderStatus} in ('pending', 'processing')`);
+      pendingOrders = pendingCount[0]?.count || 0;
+    } catch (err) {
+      console.error("Failed to fetch pending orders:", err);
     }
 
     let totalProducts = 0;
@@ -144,7 +166,9 @@ const getCachedAnalytics = unstable_cache(
 
     return {
       totalRevenue,
+      totalProfit,
       totalOrders,
+      pendingOrders,
       totalProducts,
       bestSelling,
       lowStock,

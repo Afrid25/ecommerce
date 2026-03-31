@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Logo from "@/components/Logo";
 import { signOut } from "@/lib/auth-client";
 
 type Props = {
@@ -16,6 +17,14 @@ const navItems = [
   { href: "/admin/products", label: "Products" },
   { href: "/admin/categories", label: "Categories" },
   { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/sales-engine", label: "Sales Engine" },
+  { href: "/admin/offers", label: "Offers" },
+  { href: "/admin/bundles", label: "Bundles" },
+  { href: "/admin/upsell", label: "Upsell" },
+  { href: "/admin/homepage", label: "Homepage" },
+  { href: "/admin/reviews", label: "Reviews" },
+  { href: "/admin/settings", label: "Settings" },
+  { href: "/admin/analytics", label: "Analytics" },
 ];
 
 export default function AdminShell({ title, subtitle, actions, children }: Props) {
@@ -27,7 +36,8 @@ export default function AdminShell({ title, subtitle, actions, children }: Props
       <div className="mx-auto grid min-h-screen max-w-[1440px] gap-6 px-4 py-6 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="rounded-[2rem] bg-[#16311a] p-6 text-white shadow-2xl">
           <Link href="/admin" className="block">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/55">MATVerse Admin</p>
+            <Logo className="bg-white/8" compact />
+            <p className="mt-4 text-xs font-semibold uppercase tracking-[0.28em] text-white/55">MATVerse Admin</p>
             <h1 className="mt-3 text-3xl font-semibold">Commerce OS</h1>
           </Link>
           <nav className="mt-8 space-y-2">
@@ -36,7 +46,9 @@ export default function AdminShell({ title, subtitle, actions, children }: Props
                 key={item.href}
                 href={item.href}
                 className={`block rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                  pathname === item.href ? "bg-white text-[#16311a]" : "text-white/72 hover:bg-white/10 hover:text-white"
+                  pathname === item.href || pathname.startsWith(`${item.href}/`)
+                    ? "bg-white text-[#16311a]"
+                    : "text-white/72 hover:bg-white/10 hover:text-white"
                 }`}
               >
                 {item.label}

@@ -3,9 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProductCard from "@/components/ProductCard";
 import ProductDetailActions from "@/components/ProductDetailActions";
+import ProductReviewsSection from "@/components/ProductReviewsSection";
 import ProductViewTracker from "@/components/ProductViewTracker";
 import RecentlyViewedProducts from "@/components/RecentlyViewedProducts";
+import SupportChat from "@/components/SupportChat";
 import { getCatalog, getProductById } from "@/lib/catalog";
+import { getApprovedProductReviews, getRecommendedProducts } from "@/lib/commerce";
 import { formatCurrency } from "@/lib/format";
 import { getProductEnhancement } from "@/lib/product-content";
 
@@ -22,58 +25,74 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   }
 
   const enhancement = getProductEnhancement(product);
-  const relatedCatalog = await getCatalog({
-    category: product.categorySlug || product.category,
-    pageSize: 6,
-  });
-  const relatedProducts = relatedCatalog.items.filter((item) => item.id !== product.id).slice(0, 4);
+  const approvedReviews = await getApprovedProductReviews(Number(product.id));
+  const recommendedProducts = await getRecommendedProducts(Number(product.id));
+  const relatedCatalog =
+    recommendedProducts.length === 0
+      ? await getCatalog({
+          category: product.categorySlug || product.category,
+          pageSize: 6,
+        })
+      : null;
+  const relatedProducts = (recommendedProducts.length > 0 ? recommendedProducts : relatedCatalog?.items ?? [])
+    .filter((item) => item.id !== product.id)
+    .slice(0, 4);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-14">
       <ProductViewTracker product={product} />
 
-      <div className="mb-8 flex items-center justify-between">
-        <Link href="/shop" className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)] transition hover:text-[var(--primary)]">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <Link
+          href="/shop"
+          className="text-sm font-semibold uppercase tracking-[0.2em] text-[var(--text-secondary)] transition hover:text-[var(--primary)]"
+        >
           Back to Shop
         </Link>
-        <Link href={`/category/${product.categorySlug || ""}`} className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+        <Link
+          href={`/category/${product.categorySlug || ""}`}
+          className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]"
+        >
           {product.category}
         </Link>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-4">
-          <div className="group relative overflow-hidden rounded-[36px] bg-[var(--surface)]">
+          <div className="group relative aspect-[4/5] w-full overflow-hidden rounded-[36px] bg-[var(--surface)]">
             <Image
               src={enhancement.gallery[0]}
               alt={product.name}
-              width={1200}
-              height={1400}
+              fill
               priority
-              className="h-auto w-full object-cover transition duration-700 group-hover:scale-105"
+              sizes="(max-width: 1023px) 100vw, 55vw"
+              className="object-cover transition duration-700 group-hover:scale-105"
             />
           </div>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
             {enhancement.gallery.slice(0, 3).map((image, index) => (
-              <div key={`${product.id}-${index}`} className="overflow-hidden rounded-[24px] bg-[var(--surface)]">
+              <div
+                key={`${product.id}-${index}`}
+                className="relative aspect-square overflow-hidden rounded-[24px] bg-[var(--surface)]"
+              >
                 <Image
                   src={image}
                   alt={`${product.name} view ${index + 1}`}
-                  width={400}
-                  height={400}
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="(max-width: 1023px) 33vw, 180px"
+                  className="object-cover"
                 />
               </div>
             ))}
           </div>
         </div>
 
-        <div className="rounded-[36px] border border-[var(--border)] bg-white/80 p-8 shadow-[var(--shadow-soft)] dark:bg-white/5">
+        <div className="rounded-[36px] border border-[var(--border)] bg-white/80 p-6 shadow-[var(--shadow-soft)] dark:bg-white/5 md:p-8">
           <p className="section-eyebrow">{enhancement.material}</p>
-          <h1 className="mt-4 font-[family-name:var(--font-brand)] text-5xl leading-tight">
+          <h1 className="mt-4 break-words font-[family-name:var(--font-brand)] text-4xl leading-tight md:text-5xl">
             {product.name}
           </h1>
-          <p className="mt-5 text-lg leading-8 text-[var(--text-secondary)]">
+          <p className="mt-5 text-base leading-8 text-[var(--text-secondary)]">
             {product.description}
           </p>
 
@@ -88,14 +107,23 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             ))}
           </div>
 
-          <div className="mt-8 flex items-end justify-between gap-4 border-y border-[var(--border)] py-6">
-            <div>
+          <div className="mt-8 flex flex-col gap-4 border-y border-[var(--border)] py-6 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
                 Price
               </p>
               <p className="mt-2 text-4xl font-bold">{formatCurrency(product.price)}</p>
+              {typeof product.compareAtPrice === "number" && product.compareAtPrice > product.price ? (
+                <p className="mt-2 text-sm text-[var(--text-secondary)] line-through">
+                  {formatCurrency(product.compareAtPrice)}
+                </p>
+              ) : null}
             </div>
-            <p className={`text-sm font-semibold uppercase tracking-[0.18em] ${product.stock > 0 ? "text-[#FF6A00]" : "text-red-500"}`}>
+            <p
+              className={`text-sm font-semibold uppercase tracking-[0.18em] ${
+                product.stock > 0 ? "text-[#FF6A00]" : "text-red-500"
+              }`}
+            >
               {product.stock > 0 ? `${product.stock} in stock` : "Sold out"}
             </p>
           </div>
@@ -139,43 +167,43 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               Payment Methods
             </p>
             <div className="mt-4 grid gap-3">
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between gap-4 text-sm">
                 <span>Cash on Delivery</span>
                 <span className="text-[var(--text-secondary)]">Nationwide</span>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between gap-4 text-sm">
                 <span>bKash Merchant</span>
                 <span className="text-[var(--text-secondary)]">OTP Verified</span>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between gap-4 text-sm">
                 <span>Nagad Merchant</span>
                 <span className="text-[var(--text-secondary)]">OTP Verified</span>
               </div>
             </div>
           </div>
+
+          <div className="mt-6 rounded-[28px] bg-[var(--surface)] p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+              Product Support
+            </p>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+              Ask about this product before ordering and get quick support on WhatsApp or Messenger.
+            </p>
+            <div className="mt-4">
+              <SupportChat
+                product={{
+                  name: product.name,
+                  price: product.price,
+                  url: `/product/${product.id}`,
+                }}
+                inline
+              />
+            </div>
+          </div>
         </div>
       </div>
 
-      <section className="mt-16 rounded-[36px] border border-[var(--border)] bg-white/80 p-8 shadow-[var(--shadow-soft)] dark:bg-white/5 lg:p-10">
-        <div className="mb-8">
-          <p className="section-eyebrow">Client Reviews</p>
-          <h2 className="section-title">How these pieces live inside real homes.</h2>
-        </div>
-        <div className="grid gap-5 md:grid-cols-3">
-          {enhancement.reviews.map((review) => (
-            <article key={review.id} className="rounded-[28px] bg-[var(--surface)] p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                {review.verified ? "Verified Purchase" : "Review"}
-              </p>
-              <h3 className="mt-4 text-lg font-semibold">{review.title}</h3>
-              <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{review.comment}</p>
-              <p className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
-                {review.userName} · {review.rating}/5
-              </p>
-            </article>
-          ))}
-        </div>
-      </section>
+      <ProductReviewsSection productId={Number(product.id)} reviews={approvedReviews} />
 
       {relatedProducts.length > 0 ? (
         <section className="mt-16">
@@ -183,7 +211,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             <p className="section-eyebrow">You May Also Like</p>
             <h2 className="section-title">More from this collection story.</h2>
           </div>
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {relatedProducts.map((item) => (
               <ProductCard key={item.id} product={item} />
             ))}

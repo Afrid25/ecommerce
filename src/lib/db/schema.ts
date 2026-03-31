@@ -15,10 +15,16 @@ export const products = pgTable("products", {
   name: text("name").notNull(),
   description: text("description").notNull(),
   price: real("price").notNull(),
+  compareAtPrice: real("compare_at_price"),
+  costPrice: real("cost_price").notNull().default(0),
   image: text("image").notNull(),
   category: text("category").notNull(),
   categorySlug: text("category_slug").notNull().default(""),
   stock: integer("stock").notNull().default(0),
+  isFeatured: boolean("is_featured").notNull().default(false),
+  isTrending: boolean("is_trending").notNull().default(false),
+  isHot: boolean("is_hot").notNull().default(false),
+  isLimited: boolean("is_limited").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -34,6 +40,7 @@ export const categories = pgTable("categories", {
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   orderId: text("order_id").notNull(),
+  userId: text("user_id"),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email"),
   phone: text("phone").notNull(),
@@ -43,6 +50,8 @@ export const orders = pgTable("orders", {
   orderStatus: text("order_status").notNull().default("pending"), // pending, confirmed, shipped, delivered, cancelled
   notes: text("notes"),
   totalPrice: real("total_price").notNull().default(0),
+  totalCost: real("total_cost").notNull().default(0),
+  profit: real("profit").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   orderIdIdx: uniqueIndex("orders_order_id_idx").on(table.orderId),
@@ -113,5 +122,91 @@ export const verification = pgTable("verification", {
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const offers = pgTable("offers", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  discount: integer("discount").notNull().default(0),
+  productIds: text("product_ids").notNull().default(""),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const bundles = pgTable("bundles", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  productIds: text("product_ids").notNull().default(""),
+  bundlePrice: real("bundle_price").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const cartUpsells = pgTable("cart_upsells", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id),
+  discount: integer("discount").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const productRecommendations = pgTable("product_recommendations", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id),
+  recommendedProductId: integer("recommended_product_id").notNull().references(() => products.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const homepageSettings = pgTable("homepage_settings", {
+  id: serial("id").primaryKey(),
+  heroTitle: text("hero_title").notNull().default("Design to Elevate Your Space"),
+  heroSubtitle: text("hero_subtitle").notNull().default("Premium bamboo, wood, and low-waste essentials curated for calm modern homes."),
+  heroImage: text("hero_image").notNull().default("/images/matverse/interior_scene_collage.jpg"),
+  heroCtaText: text("hero_cta_text").notNull().default("Shop Now"),
+  bannerText: text("banner_text").notNull().default("Curated drops, responsive support, and checkout that actually converts."),
+  featuredProductIds: text("featured_product_ids").notNull().default(""),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  businessEmail: text("business_email").notNull().default("matversebd@gmail.com"),
+  phone: text("phone").notNull().default("+880 1712-345678"),
+  address: text("address").notNull().default("Dhaka, Bangladesh"),
+  facebook: text("facebook").notNull().default("https://facebook.com"),
+  instagram: text("instagram").notNull().default("https://instagram.com"),
+  whatsappNumber: text("whatsapp_number").notNull().default("8801712345678"),
+  messengerLink: text("messenger_link").notNull().default("https://m.me"),
+  supportEmail: text("support_email").notNull().default("matversebd@gmail.com"),
+  supportHours: text("support_hours").notNull().default("10:00 AM - 10:00 PM, every day"),
+  footerContent: text("footer_content").notNull().default("Premium, mobile-first commerce for eco lifestyle essentials."),
+  primaryColor: text("primary_color").notNull().default("#ff6a00"),
+  accentColor: text("accent_color").notNull().default("#ff6a00"),
+  backgroundColor: text("background_color").notNull().default("#ffffff"),
+  buttonStyle: text("button_style").notNull().default("pill"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  userId: text("user_id"),
+  userName: text("user_name").notNull(),
+  rating: integer("rating").notNull(),
+  title: text("title").notNull(),
+  comment: text("comment").notNull(),
+  image: text("image"),
+  images: text("images").notNull().default("[]"),
+  status: text("status").notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const analyticsEvents = pgTable("analytics_events", {
+  id: serial("id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  productId: integer("product_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

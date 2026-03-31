@@ -1,201 +1,139 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { signIn, signUp, useSession } from "@/lib/auth-client";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn, signUp, useSession } from "@/lib/auth-client";
 
 export default function AdminLoginPage() {
   const router = useRouter();
   const { data: session } = useSession();
-
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
   });
 
-  // 🔒 Redirect if already logged in
   useEffect(() => {
     if (session) {
       router.replace("/admin");
     }
-  }, [session, router]);
-
-  const updateForm = (field: string, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const validate = () => {
-    if (!form.email.includes("@")) return "Invalid email";
-    if (form.password.length < 8) return "Password must be at least 8 characters";
-    if (isSignUp && !form.name.trim()) return "Name is required";
-    return null;
-  };
+  }, [router, session]);
 
   const bootstrapAdminIfNeeded = async (email: string) => {
-    const response = await fetch("/api/admin/bootstrap", {
+    await fetch("/api/admin/bootstrap", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
-    });
-
-    if (!response.ok) {
-      return;
-    }
-
-    await response.json().catch(() => null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (loading) return; // prevent double submit
-
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-
-    try {
-      let result;
-
-      if (isSignUp) {
-        result = await signUp.email({
-          name: form.name.trim(),
-          email: form.email.trim(),
-          password: form.password,
-        });
-      } else {
-        result = await signIn.email({
-          email: form.email.trim(),
-          password: form.password,
-        });
-      }
-
-      if (result?.error) {
-        setError(result.error.message || "Authentication failed");
-        return;
-      }
-
-      await bootstrapAdminIfNeeded(form.email.trim());
-      router.replace("/admin"); // better than push
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Unexpected error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleMode = () => {
-    setIsSignUp((prev) => !prev);
-    setError("");
-    setForm({
-      name: "",
-      email: "",
-      password: "",
-    });
+    }).catch(() => null);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 bg-white dark:bg-black">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-black tracking-tight mb-4">
-            {isSignUp ? "Create Admin Account" : "Admin Access"}
+    <section className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,106,0,0.18),_transparent_32%),linear-gradient(135deg,#0d160e_0%,#17311a_50%,#efe2d3_50%,#f8f4ee_100%)] px-4 py-24">
+      <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.92fr_1.08fr]">
+        <div className="rounded-[2.5rem] border border-white/10 bg-black/20 p-8 text-white backdrop-blur">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/65">
+            MATVerse Admin
+          </p>
+          <h1 className="mt-5 font-display text-5xl leading-none md:text-6xl">
+            Run products, orders, offers, and support from one control room.
           </h1>
-          <p className="text-lg opacity-60">
-            {isSignUp
-              ? "Register your admin account"
-              : "Sign in to manage your store"}
+          <p className="mt-5 text-sm leading-7 text-white/75">
+            Secure admin access for catalog operations, content changes, and revenue visibility.
           </p>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="border border-red-500 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 p-3 mb-6 text-sm">
-            {error}
-          </div>
-        )}
+        <div className="rounded-[2.5rem] border border-[var(--border)] bg-white/88 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.14)] backdrop-blur">
+          <h2 className="text-3xl font-semibold text-[#16311a]">
+            {isSignUp ? "Create admin account" : "Admin access"}
+          </h2>
+          <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+            {isSignUp ? "Register the first admin or add another approved operator." : "Sign in to manage MATVerse."}
+          </p>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {isSignUp && (
-            <div>
-              <label className="block text-sm font-bold uppercase opacity-60 mb-2">
-                Name
-              </label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => updateForm("name", e.target.value)}
-                className="w-full border px-4 py-3 bg-white dark:bg-gray-900"
-              />
+          {error ? (
+            <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
             </div>
-          )}
+          ) : null}
 
-          <div>
-            <label className="block text-sm font-bold uppercase opacity-60 mb-2">
-              Email
-            </label>
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setLoading(true);
+              setError("");
+
+              try {
+                const result = isSignUp
+                  ? await signUp.email({
+                      name: form.name,
+                      email: form.email,
+                      password: form.password,
+                    })
+                  : await signIn.email({
+                      email: form.email,
+                      password: form.password,
+                    });
+
+                if (result?.error) {
+                  setError(result.error.message || "Authentication failed");
+                  return;
+                }
+
+                await bootstrapAdminIfNeeded(form.email);
+                router.replace("/admin");
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Authentication failed");
+              } finally {
+                setLoading(false);
+              }
+            }}
+            className="mt-8 space-y-4"
+          >
+            {isSignUp ? (
+              <input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Admin name"
+                className="w-full rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] px-5 py-4"
+              />
+            ) : null}
             <input
               type="email"
               value={form.email}
-              onChange={(e) => updateForm("email", e.target.value)}
-              className="w-full border px-4 py-3 bg-white dark:bg-gray-900"
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+              placeholder="Email address"
+              className="w-full rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] px-5 py-4"
             />
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold uppercase opacity-60 mb-2">
-              Password
-            </label>
             <input
               type="password"
               value={form.password}
-              onChange={(e) => updateForm("password", e.target.value)}
-              className="w-full border px-4 py-3 bg-white dark:bg-gray-900"
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="Password"
+              className="w-full rounded-[1.5rem] border border-[var(--border)] bg-[var(--surface)] px-5 py-4"
             />
-          </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-[#16311a] px-6 py-4 text-sm font-semibold uppercase tracking-[0.18em] text-white disabled:opacity-60"
+            >
+              {loading ? "Please wait" : isSignUp ? "Create admin account" : "Sign in"}
+            </button>
+          </form>
 
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-4 font-bold text-lg bg-black text-white dark:bg-white dark:text-black disabled:opacity-50"
+            onClick={() => {
+              setIsSignUp((value) => !value);
+              setError("");
+            }}
+            className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--primary)]"
           >
-            {loading
-              ? isSignUp
-                ? "Creating..."
-                : "Signing in..."
-              : isSignUp
-              ? "Create Account"
-              : "Sign In"}
-          </button>
-        </form>
-
-        {/* Toggle */}
-        <div className="text-center mt-6 border-t pt-6">
-          <p className="text-sm opacity-60 mb-2">
-            {isSignUp
-              ? "Already have an account?"
-              : "Don't have an account?"}
-          </p>
-          <button
-            onClick={toggleMode}
-            className="text-sm font-bold uppercase"
-          >
-            {isSignUp ? "Sign In" : "Sign Up"}
+            {isSignUp ? "Use existing admin account" : "Create first admin account"}
           </button>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

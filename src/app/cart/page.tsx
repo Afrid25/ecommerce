@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useCartStore } from "@/store/cart";
 import { useHydrated } from "@/hooks/useHydrated";
 import { useToastStore } from "@/store/toast";
@@ -7,10 +8,47 @@ import { formatCurrency } from "@/lib/format";
 import Link from "next/link";
 import Image from "next/image";
 
+type UpsellProduct = {
+  id: number;
+  name: string;
+  price: number;
+  compareAtPrice?: number | null;
+  image: string;
+  stock: number;
+};
+
 export default function CartPage() {
   const mounted = useHydrated();
-  const { items, removeItem, updateQuantity, getTotalPrice, clearCart } = useCartStore();
+  const { items, removeItem, updateQuantity, getTotalPrice, clearCart, addItem } = useCartStore();
   const showToast = useToastStore((state) => state.showToast);
+  const [upsells, setUpsells] = useState<UpsellProduct[]>([]);
+
+  useEffect(() => {
+    const loadUpsells = async () => {
+      const [upsellRes, productRes] = await Promise.all([
+        fetch("/api/upsell", { cache: "no-store" }),
+        fetch("/api/products", { cache: "no-store" }),
+      ]);
+      const upsellRows = await upsellRes.json().catch(() => []);
+      const productRows = await productRes.json().catch(() => []);
+
+      if (!Array.isArray(upsellRows) || !Array.isArray(productRows)) {
+        return;
+      }
+
+      const activeProducts = upsellRows
+        .filter((entry) => entry.isActive)
+        .map((entry) => productRows.find((product) => product.id === entry.productId))
+        .filter(Boolean)
+        .slice(0, 3);
+
+      setUpsells(activeProducts);
+    };
+
+    if (mounted) {
+      void loadUpsells();
+    }
+  }, [mounted]);
 
   if (!mounted) {
     return (
@@ -173,6 +211,36 @@ export default function CartPage() {
                 <p>Free returns within 7 days</p>
                 <p>Multiple payment options</p>
               </div>
+
+              {upsells.length > 0 ? (
+                <div className="mt-8 border-t border-gray-200 pt-8 dark:border-gray-800">
+                  <p className="text-sm font-semibold">Add one more item</p>
+                  <div className="mt-4 space-y-3">
+                    {upsells.map((product) => (
+                      <div key={product.id} className="rounded-2xl bg-[var(--surface)] p-4">
+                        <p className="text-sm font-semibold">{product.name}</p>
+                        <p className="mt-1 text-sm text-[var(--text-secondary)]">{formatCurrency(product.price)}</p>
+                        <button
+                          onClick={() => {
+                            addItem({
+                              id: product.id,
+                              name: product.name,
+                              price: product.price,
+                              compareAtPrice: product.compareAtPrice,
+                              image: product.image,
+                              stock: product.stock,
+                            });
+                            showToast(`${product.name} added as an upsell.`, "success");
+                          }}
+                          className="mt-3 rounded-full border border-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary)]"
+                        >
+                          Add this item
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

@@ -10,7 +10,9 @@ import { formatCurrency } from "@/lib/format";
 
 interface Analytics {
   totalRevenue: number;
+  totalProfit: number;
   totalOrders: number;
+  pendingOrders: number;
   totalProducts: number;
   bestSelling: Array<{
     productId: number;
@@ -93,10 +95,12 @@ export default function AdminDashboard() {
         </div>
       ) : analytics ? (
         <div className="space-y-8">
-          <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             {[
               ["Total Revenue", formatCurrency(Number(analytics.totalRevenue))],
+              ["Total Profit", formatCurrency(Number(analytics.totalProfit))],
               ["Total Orders", analytics.totalOrders.toLocaleString()],
+              ["Pending Orders", analytics.pendingOrders.toLocaleString()],
               ["Total Products", analytics.totalProducts.toLocaleString()],
               ["Low Stock Alerts", analytics.lowStock.length.toLocaleString()],
             ].map(([label, value]) => (

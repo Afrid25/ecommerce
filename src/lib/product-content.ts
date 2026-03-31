@@ -1,4 +1,3 @@
-import type { Review } from "@/types/review";
 import type { Product } from "@/types/product";
 
 type ProductEnhancement = {
@@ -9,43 +8,9 @@ type ProductEnhancement = {
   gallery: string[];
   dimensions: string;
   care: string;
-  reviews: Review[];
 };
 
-const reviewSets: Review[] = [
-  {
-    id: "rev-1",
-    userName: "Nabila S.",
-    rating: 5,
-    title: "Exactly the quiet luxury look I wanted",
-    comment:
-      "The finish feels natural and premium. It blended perfectly into our neutral apartment styling.",
-    verified: true,
-    createdAt: "2026-03-02",
-  },
-  {
-    id: "rev-2",
-    userName: "Arefin H.",
-    rating: 4,
-    title: "Thoughtful details and strong packaging",
-    comment:
-      "The craftsmanship and packaging felt elevated. I would love a few more matching pieces in the same collection.",
-    verified: true,
-    createdAt: "2026-03-10",
-  },
-  {
-    id: "rev-3",
-    userName: "Samira R.",
-    rating: 5,
-    title: "Beautiful material story",
-    comment:
-      "It does not feel mass-market. The texture, weight, and color all feel calm and considered.",
-    verified: true,
-    createdAt: "2026-03-14",
-  },
-];
-
-const enhancementMap: Record<string, Omit<ProductEnhancement, "reviews">> = {
+const enhancementMap: Record<string, ProductEnhancement> = {
   "Aurora Cane Lounge Chair": {
     material: "Cane",
     materialBadges: ["Cane Weave", "Ash Wood", "Low-VOC Finish"],
@@ -140,7 +105,6 @@ function createDefaultEnhancement(product: Product): ProductEnhancement {
     gallery: [product.image, product.image, product.image],
     dimensions: "Available on request",
     care: "Use a soft cloth and avoid harsh cleaners to preserve the finish.",
-    reviews: reviewSets,
   };
 }
 
@@ -151,10 +115,7 @@ export function getProductEnhancement(product: Product): ProductEnhancement {
     return createDefaultEnhancement(product);
   }
 
-  return {
-    ...match,
-    reviews: reviewSets,
-  };
+  return match;
 }
 
 export function getMaterialForProduct(product: Product) {

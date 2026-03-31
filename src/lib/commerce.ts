@@ -1,8 +1,26 @@
 import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
-import { db, isDatabaseConfigured } from "@/lib/db";
+import {
+  db,
+  describeDatabaseFailure,
+  isDatabaseConfigured,
+  logDatabaseError,
+} from "@/lib/db";
 import { categoryDefinitions, getCategoryBySlug, resolveCategorySlug } from "@/lib/categories";
-import { orderItems, orders, products } from "@/lib/db/schema";
+import {
+  analyticsEvents,
+  bundles,
+  cartUpsells,
+  homepageSettings,
+  offers,
+  orderItems,
+  orders,
+  productRecommendations,
+  products,
+  reviews,
+  siteSettings,
+} from "@/lib/db/schema";
+import { defaultHomepageSettings, defaultSiteSettings, seededProducts } from "@/lib/matverse-data";
 
 export type OrderPayload = {
   customerName: string;
@@ -12,21 +30,76 @@ export type OrderPayload = {
   paymentMethod: "cod" | "bkash" | "nagad" | "cash" | "offline";
   source: "online" | "manual";
   notes?: string;
+  userId?: string | null;
   items: Array<{
     productId: number;
     quantity: number;
   }>;
 };
 
+export type OrderErrorCode =
+  | "INSUFFICIENT_STOCK"
+  | "INVALID_CART"
+  | "VALIDATION_ERROR"
+  | "DATABASE_ERROR";
+
 type LockedProduct = {
   id: number;
   name: string;
   image: string;
   price: number;
+  costPrice: number;
   stock: number;
 };
 
 let schemaEnsured = false;
+
+export class OrderFlowError extends Error {
+  code: OrderErrorCode;
+  details?: Record<string, unknown>;
+
+  constructor(code: OrderErrorCode, message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.name = "OrderFlowError";
+    this.code = code;
+    this.details = details;
+  }
+}
+
+function buildSeedIdentity(name: string, image: string) {
+  return `${name.trim().toLowerCase()}::${image.trim()}`;
+}
+
+function getOrderStatusForPaymentMethod(paymentMethod: OrderPayload["paymentMethod"]) {
+  if (paymentMethod === "bkash" || paymentMethod === "nagad") {
+    return "pending_payment";
+  }
+
+  return "confirmed";
+}
+
+function parseStoredImages(imagesValue?: string | null, legacyImage?: string | null) {
+  const parsedImages = (() => {
+    if (!imagesValue) {
+      return [];
+    }
+
+    try {
+      const value = JSON.parse(imagesValue);
+      return Array.isArray(value)
+        ? value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+        : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  if (legacyImage && !parsedImages.includes(legacyImage)) {
+    parsedImages.unshift(legacyImage);
+  }
+
+  return parsedImages;
+}
 
 function isMissingRelationError(error: unknown) {
   if (!error || typeof error !== "object") {
@@ -47,13 +120,14 @@ function normalizeLockedProduct(row: unknown): LockedProduct | null {
   const name = typeof record.name === "string" ? record.name : "";
   const image = typeof record.image === "string" ? record.image : "";
   const price = Number(record.price);
+  const costPrice = Number(record.cost_price ?? record.costPrice ?? 0);
   const stock = Number(record.stock);
 
-  if (!Number.isInteger(id) || !name || !image || Number.isNaN(price) || !Number.isInteger(stock)) {
+  if (!Number.isInteger(id) || !name || !image || Number.isNaN(price) || Number.isNaN(costPrice) || !Number.isInteger(stock)) {
     return null;
   }
 
-  return { id, name, image, price, stock };
+  return { id, name, image, price, costPrice, stock };
 }
 
 function buildOrderId() {
@@ -62,7 +136,83 @@ function buildOrderId() {
   return `MAT-${stamp}-${random}`;
 }
 
-export async function ensureCommerceSchema() {
+export function parseIdList(value?: string | null) {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((entry) => Number.parseInt(entry.trim(), 10))
+    .filter((entry) => Number.isInteger(entry) && entry > 0);
+}
+
+export function stringifyIdList(ids: number[]) {
+  return Array.from(new Set(ids.filter((id) => Number.isInteger(id) && id > 0))).join(",");
+}
+
+async function seedSingletonRows() {
+  await db
+    .insert(homepageSettings)
+    .values({ id: 1, ...defaultHomepageSettings })
+    .onConflictDoNothing();
+
+  await db
+    .insert(siteSettings)
+    .values({ id: 1, ...defaultSiteSettings })
+    .onConflictDoNothing();
+}
+
+async function seedCatalogProducts() {
+  const existingProducts = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      category: products.category,
+      categorySlug: products.categorySlug,
+      costPrice: products.costPrice,
+      compareAtPrice: products.compareAtPrice,
+      image: products.image,
+      isFeatured: products.isFeatured,
+      isTrending: products.isTrending,
+      isHot: products.isHot,
+      isLimited: products.isLimited,
+    })
+    .from(products);
+
+  const existingByIdentity = new Map(
+    existingProducts.map((product) => [buildSeedIdentity(product.name, product.image), product])
+  );
+
+  for (const seededProduct of seededProducts) {
+    const existing = existingByIdentity.get(buildSeedIdentity(seededProduct.name, seededProduct.image));
+
+    if (!existing) {
+      await db.insert(products).values({
+        ...seededProduct,
+        compareAtPrice: seededProduct.compareAtPrice ?? null,
+      });
+      continue;
+    }
+
+    await db
+      .update(products)
+      .set({
+        category: seededProduct.category,
+        categorySlug: seededProduct.categorySlug,
+        image: existing.image || seededProduct.image,
+        costPrice: existing.costPrice > 0 ? existing.costPrice : seededProduct.costPrice,
+        compareAtPrice: existing.compareAtPrice ?? seededProduct.compareAtPrice ?? null,
+        isFeatured: existing.isFeatured || Boolean(seededProduct.isFeatured),
+        isTrending: existing.isTrending || Boolean(seededProduct.isTrending),
+        isHot: existing.isHot || Boolean(seededProduct.isHot),
+        isLimited: existing.isLimited || Boolean(seededProduct.isLimited),
+      })
+      .where(eq(products.id, existing.id));
+  }
+}
+
+export async function ensureCommerceSchema(options?: { throwOnError?: boolean; reason?: string }) {
   if (!isDatabaseConfigured() || schemaEnsured) {
     return;
   }
@@ -80,21 +230,145 @@ export async function ensureCommerceSchema() {
     `);
 
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS homepage_settings (
+        id serial PRIMARY KEY,
+        hero_title text NOT NULL DEFAULT 'Design to Elevate Your Space',
+        hero_subtitle text NOT NULL DEFAULT 'Premium bamboo, wood, and low-waste essentials curated for calm modern homes.',
+        hero_image text NOT NULL DEFAULT '/images/matverse/interior_scene_collage.jpg',
+        hero_cta_text text NOT NULL DEFAULT 'Shop Now',
+        banner_text text NOT NULL DEFAULT 'Curated drops, responsive support, and checkout that actually converts.',
+        featured_product_ids text NOT NULL DEFAULT '',
+        updated_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS site_settings (
+        id serial PRIMARY KEY,
+        business_email text NOT NULL DEFAULT 'matversebd@gmail.com',
+        phone text NOT NULL DEFAULT '+880 1712-345678',
+        address text NOT NULL DEFAULT 'Dhaka, Bangladesh',
+        facebook text NOT NULL DEFAULT 'https://facebook.com',
+        instagram text NOT NULL DEFAULT 'https://instagram.com',
+        whatsapp_number text NOT NULL DEFAULT '8801712345678',
+        messenger_link text NOT NULL DEFAULT 'https://m.me',
+        support_email text NOT NULL DEFAULT 'matversebd@gmail.com',
+        support_hours text NOT NULL DEFAULT '10:00 AM - 10:00 PM, every day',
+        footer_content text NOT NULL DEFAULT 'Premium, mobile-first commerce for eco lifestyle essentials.',
+        primary_color text NOT NULL DEFAULT '#ff6a00',
+        accent_color text NOT NULL DEFAULT '#ff6a00',
+        background_color text NOT NULL DEFAULT '#ffffff',
+        button_style text NOT NULL DEFAULT 'pill',
+        updated_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      ALTER TABLE site_settings
+      ADD COLUMN IF NOT EXISTS primary_color text DEFAULT '#ff6a00',
+      ADD COLUMN IF NOT EXISTS accent_color text DEFAULT '#ff6a00',
+      ADD COLUMN IF NOT EXISTS background_color text DEFAULT '#ffffff',
+      ADD COLUMN IF NOT EXISTS button_style text DEFAULT 'pill';
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS offers (
+        id serial PRIMARY KEY,
+        title text NOT NULL,
+        discount integer NOT NULL DEFAULT 0,
+        product_ids text NOT NULL DEFAULT '',
+        start_date timestamp,
+        end_date timestamp,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS bundles (
+        id serial PRIMARY KEY,
+        title text NOT NULL,
+        product_ids text NOT NULL DEFAULT '',
+        bundle_price real NOT NULL DEFAULT 0,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cart_upsells (
+        id serial PRIMARY KEY,
+        product_id integer REFERENCES products(id) ON DELETE CASCADE,
+        discount integer NOT NULL DEFAULT 0,
+        is_active boolean NOT NULL DEFAULT true,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS product_recommendations (
+        id serial PRIMARY KEY,
+        product_id integer REFERENCES products(id) ON DELETE CASCADE,
+        recommended_product_id integer REFERENCES products(id) ON DELETE CASCADE,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS reviews (
+        id serial PRIMARY KEY,
+        product_id integer REFERENCES products(id) ON DELETE CASCADE,
+        user_id text,
+        user_name text NOT NULL,
+        rating integer NOT NULL,
+        title text NOT NULL,
+        comment text NOT NULL,
+        image text,
+        images text NOT NULL DEFAULT '[]',
+        status text NOT NULL DEFAULT 'pending',
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS analytics_events (
+        id serial PRIMARY KEY,
+        event_type text NOT NULL,
+        product_id integer,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
       ALTER TABLE products
-      ADD COLUMN IF NOT EXISTS category_slug text DEFAULT '';
+      ADD COLUMN IF NOT EXISTS category_slug text DEFAULT '',
+      ADD COLUMN IF NOT EXISTS compare_at_price real,
+      ADD COLUMN IF NOT EXISTS cost_price real DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS is_featured boolean DEFAULT false,
+      ADD COLUMN IF NOT EXISTS is_trending boolean DEFAULT false,
+      ADD COLUMN IF NOT EXISTS is_hot boolean DEFAULT false,
+      ADD COLUMN IF NOT EXISTS is_limited boolean DEFAULT false;
     `);
 
     await db.execute(sql`
       ALTER TABLE orders
       ADD COLUMN IF NOT EXISTS customer_email text,
       ADD COLUMN IF NOT EXISTS source text DEFAULT 'online',
-      ADD COLUMN IF NOT EXISTS notes text;
+      ADD COLUMN IF NOT EXISTS notes text,
+      ADD COLUMN IF NOT EXISTS user_id text,
+      ADD COLUMN IF NOT EXISTS total_cost real DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS profit real DEFAULT 0;
     `);
 
     await db.execute(sql`
       ALTER TABLE order_items
       ADD COLUMN IF NOT EXISTS product_name text DEFAULT '',
       ADD COLUMN IF NOT EXISTS product_image text DEFAULT '';
+    `);
+
+    await db.execute(sql`
+      ALTER TABLE reviews
+      ADD COLUMN IF NOT EXISTS images text DEFAULT '[]';
     `);
 
     for (const category of categoryDefinitions) {
@@ -133,10 +407,21 @@ export async function ensureCommerceSchema() {
         .where(eq(products.id, product.id));
     }
 
+    await seedSingletonRows();
+    await seedCatalogProducts();
     schemaEnsured = true;
   } catch (error) {
     if (!isMissingRelationError(error)) {
-      console.warn("Commerce schema bootstrap skipped:", error);
+      logDatabaseError(
+        "[COMMERCE_SCHEMA_BOOTSTRAP_FAILED]",
+        error,
+        "ensure-commerce-schema",
+        { reason: options?.reason ?? "unspecified" }
+      );
+    }
+
+    if (options?.throwOnError) {
+      throw error;
     }
   }
 }
@@ -170,91 +455,205 @@ export async function getCategoryRecords() {
   }
 }
 
-export async function createOrder(payload: OrderPayload) {
+export async function getHomepageSettings() {
+  if (!isDatabaseConfigured()) {
+    return { id: 1, ...defaultHomepageSettings };
+  }
+
   await ensureCommerceSchema();
+  const [settings] = await db.select().from(homepageSettings).where(eq(homepageSettings.id, 1)).limit(1);
+  return settings ?? { id: 1, ...defaultHomepageSettings };
+}
+
+export async function getSiteSettings() {
+  if (!isDatabaseConfigured()) {
+    return { id: 1, ...defaultSiteSettings };
+  }
+
+  await ensureCommerceSchema();
+  const [settings] = await db.select().from(siteSettings).where(eq(siteSettings.id, 1)).limit(1);
+  return settings ?? { id: 1, ...defaultSiteSettings };
+}
+
+export async function createOrder(payload: OrderPayload) {
+  let stage = "schema-bootstrap";
 
   const aggregatedItems = Array.from(
     payload.items.reduce((map, item) => {
-      map.set(item.productId, (map.get(item.productId) ?? 0) + item.quantity);
+      if (Number.isInteger(item.productId) && item.productId > 0 && Number.isInteger(item.quantity) && item.quantity > 0) {
+        map.set(item.productId, (map.get(item.productId) ?? 0) + item.quantity);
+      }
       return map;
     }, new Map<number, number>())
   ).map(([productId, quantity]) => ({ productId, quantity }));
 
+  if (aggregatedItems.length === 0) {
+    throw new OrderFlowError("INVALID_CART", "Your cart is empty.", {
+      reason: "EMPTY_CART",
+    });
+  }
+
   const orderId = buildOrderId();
-
-  const createdOrder = await db.transaction(async (tx) => {
-    const lockedProducts: LockedProduct[] = [];
-
-    for (const item of aggregatedItems) {
-      const result = await tx.execute(sql`
-        SELECT id, name, image, price, stock
-        FROM products
-        WHERE id = ${item.productId}
-        FOR UPDATE
-      `);
-
-      const product = normalizeLockedProduct(result.rows[0]);
-      if (!product) {
-        throw new Error(`PRODUCT_NOT_FOUND:${item.productId}`);
-      }
-
-      if (product.stock < item.quantity) {
-        throw new Error(`INSUFFICIENT_STOCK:${product.name}:${product.stock}`);
-      }
-
-      lockedProducts.push(product);
-    }
-
-    const totalPrice = aggregatedItems.reduce((sum, item) => {
-      const product = lockedProducts.find((entry) => entry.id === item.productId)!;
-      return sum + product.price * item.quantity;
-    }, 0);
-
-    const [created] = await tx
-      .insert(orders)
-      .values({
-        orderId,
-        customerName: payload.customerName.trim(),
-        customerEmail: payload.customerEmail?.trim() || null,
-        phone: payload.phone.trim(),
-        address: payload.address.trim(),
-        paymentMethod: payload.paymentMethod,
-        orderStatus: "pending",
-        totalPrice,
-        source: payload.source,
-        notes: payload.notes?.trim() || null,
-      })
-      .returning();
-
-    for (const item of aggregatedItems) {
-      const product = lockedProducts.find((entry) => entry.id === item.productId)!;
-
-      await tx
-        .update(products)
-        .set({ stock: sql`${products.stock} - ${item.quantity}` })
-        .where(eq(products.id, product.id));
-
-      await tx.insert(orderItems).values({
-        orderId: created.id,
-        productId: product.id,
-        quantity: item.quantity,
-        unitPrice: product.price,
-        totalPrice: product.price * item.quantity,
-        productName: product.name,
-        productImage: product.image,
-      });
-    }
-
-    return created;
+  console.info("[ORDER_ATTEMPT]", {
+    user: payload.userId ?? "guest",
+    items: aggregatedItems.length,
+    orderId,
   });
 
-  revalidateTag("analytics", "max");
-  revalidateTag("catalog", "max");
+  try {
+    await ensureCommerceSchema({ throwOnError: true, reason: "create-order" });
+    stage = "start-transaction";
+    const createdOrder = await db.transaction(async (tx) => {
+      const lockedProducts: LockedProduct[] = [];
 
-  return createdOrder;
+      stage = "lock-products";
+      for (const item of aggregatedItems) {
+        const result = await tx.execute(sql`
+          SELECT id, name, image, price, cost_price, stock
+          FROM products
+          WHERE id = ${item.productId}
+          FOR UPDATE
+        `);
+
+        const product = normalizeLockedProduct(result.rows[0]);
+        if (!product) {
+          throw new OrderFlowError("INVALID_CART", "One of the products in your cart no longer exists.", {
+            productId: item.productId,
+          });
+        }
+
+        console.info("[STOCK_CHECK]", {
+          productId: product.id,
+          stock: product.stock,
+          requested: item.quantity,
+        });
+
+        if (product.stock < item.quantity) {
+          throw new OrderFlowError(
+            "INSUFFICIENT_STOCK",
+            product.stock > 0
+              ? `Only ${product.stock} items left for ${product.name}.`
+              : `${product.name} is currently out of stock.`,
+            {
+              productId: product.id,
+              productName: product.name,
+              availableStock: product.stock,
+            }
+          );
+        }
+
+        lockedProducts.push(product);
+      }
+
+      const totalPrice = aggregatedItems.reduce((sum, item) => {
+        const product = lockedProducts.find((entry) => entry.id === item.productId)!;
+        return sum + product.price * item.quantity;
+      }, 0);
+
+      const totalCost = aggregatedItems.reduce((sum, item) => {
+        const product = lockedProducts.find((entry) => entry.id === item.productId)!;
+        return sum + product.costPrice * item.quantity;
+      }, 0);
+
+      const orderStatus = getOrderStatusForPaymentMethod(payload.paymentMethod);
+
+      stage = "insert-order";
+      const [created] = await tx
+        .insert(orders)
+        .values({
+          orderId,
+          userId: payload.userId ?? null,
+          customerName: payload.customerName.trim(),
+          customerEmail: payload.customerEmail?.trim() || null,
+          phone: payload.phone.trim(),
+          address: payload.address.trim(),
+          paymentMethod: payload.paymentMethod,
+          orderStatus,
+          totalPrice,
+          totalCost,
+          profit: totalPrice - totalCost,
+          source: payload.source,
+          notes: payload.notes?.trim() || null,
+        })
+        .returning();
+
+      stage = "write-order-items";
+      for (const item of aggregatedItems) {
+        const product = lockedProducts.find((entry) => entry.id === item.productId)!;
+
+        stage = "update-stock";
+        await tx
+          .update(products)
+          .set({ stock: sql`${products.stock} - ${item.quantity}` })
+          .where(eq(products.id, product.id));
+
+        stage = "insert-order-item";
+        await tx.insert(orderItems).values({
+          orderId: created.id,
+          productId: product.id,
+          quantity: item.quantity,
+          unitPrice: product.price,
+          totalPrice: product.price * item.quantity,
+          productName: product.name,
+          productImage: product.image,
+        });
+      }
+
+      return created;
+    });
+
+    stage = "record-analytics";
+    console.info("[ORDER_CREATED]", {
+      orderId: createdOrder.orderId,
+      status: createdOrder.orderStatus,
+    });
+
+    await recordAnalyticsEvent("order_complete");
+    revalidateTag("analytics", "max");
+    revalidateTag("catalog", "max");
+    revalidateTag("site", "max");
+
+    return createdOrder;
+  } catch (error) {
+    if (error instanceof OrderFlowError) {
+      console.error("[ORDER_FAILED]", {
+        reason: error.code,
+        details: error.details ?? null,
+      });
+      throw error;
+    }
+
+    const failure = describeDatabaseFailure(error, "create-order", {
+      stage,
+      itemCount: aggregatedItems.length,
+    });
+
+    console.error("[ORDER_FAILED]", {
+      reason: "DATABASE_ERROR",
+      ...failure.diagnostics,
+    });
+
+    throw new OrderFlowError(
+      "DATABASE_ERROR",
+      `${failure.userMessage} Order creation stopped at stage "${stage}".`,
+      failure.diagnostics,
+    );
+  }
 }
 
-export async function getOrderList(options?: { status?: string; source?: string }) {
+export async function recordAnalyticsEvent(eventType: string, productId?: number) {
+  if (!isDatabaseConfigured()) {
+    return;
+  }
+
+  await ensureCommerceSchema();
+  await db.insert(analyticsEvents).values({
+    eventType,
+    productId: productId ?? null,
+  });
+}
+
+export async function getOrderList(options?: { status?: string; source?: string; userId?: string }) {
   await ensureCommerceSchema();
 
   const orderRows = await db
@@ -263,7 +662,8 @@ export async function getOrderList(options?: { status?: string; source?: string 
     .where(
       and(
         options?.status ? eq(orders.orderStatus, options.status) : undefined,
-        options?.source ? eq(orders.source, options.source) : undefined
+        options?.source ? eq(orders.source, options.source) : undefined,
+        options?.userId ? eq(orders.userId, options.userId) : undefined
       )
     )
     .orderBy(desc(orders.createdAt));
@@ -312,4 +712,107 @@ export async function getCatalogProducts(options?: {
       )
     )
     .orderBy(desc(products.createdAt));
+}
+
+export async function getApprovedProductReviews(productId: number) {
+  if (!isDatabaseConfigured()) {
+    return [];
+  }
+
+  await ensureCommerceSchema();
+
+  const reviewRows = await db
+    .select()
+    .from(reviews)
+    .where(and(eq(reviews.productId, productId), eq(reviews.status, "approved")))
+    .orderBy(desc(reviews.createdAt));
+
+  return reviewRows.map((review) => ({
+    ...review,
+    images: parseStoredImages(review.images, review.image),
+  }));
+}
+
+export async function getReviewList(options?: { status?: string; productId?: number }) {
+  if (!isDatabaseConfigured()) {
+    return [];
+  }
+
+  await ensureCommerceSchema();
+
+  const reviewRows = await db
+    .select()
+    .from(reviews)
+    .where(
+      and(
+        options?.status ? eq(reviews.status, options.status) : undefined,
+        options?.productId ? eq(reviews.productId, options.productId) : undefined
+      )
+    )
+    .orderBy(desc(reviews.createdAt));
+
+  return reviewRows.map((review) => ({
+    ...review,
+    images: parseStoredImages(review.images, review.image),
+  }));
+}
+
+export async function getActiveUpsells(limit = 4) {
+  if (!isDatabaseConfigured()) {
+    return [];
+  }
+
+  await ensureCommerceSchema();
+  const upsellRows = await db
+    .select()
+    .from(cartUpsells)
+    .where(eq(cartUpsells.isActive, true))
+    .orderBy(desc(cartUpsells.createdAt))
+    .limit(limit);
+
+  if (upsellRows.length === 0) {
+    return [];
+  }
+
+  return db.select().from(products).where(inArray(products.id, upsellRows.map((entry) => entry.productId)));
+}
+
+export async function getRecommendedProducts(productId: number, limit = 4) {
+  if (!isDatabaseConfigured()) {
+    return [];
+  }
+
+  await ensureCommerceSchema();
+  const recommendationRows = await db
+    .select()
+    .from(productRecommendations)
+    .where(eq(productRecommendations.productId, productId))
+    .limit(limit);
+
+  if (recommendationRows.length === 0) {
+    return [];
+  }
+
+  return db
+    .select()
+    .from(products)
+    .where(inArray(products.id, recommendationRows.map((entry) => entry.recommendedProductId)));
+}
+
+export async function getOfferList() {
+  if (!isDatabaseConfigured()) {
+    return [];
+  }
+
+  await ensureCommerceSchema();
+  return db.select().from(offers).orderBy(desc(offers.createdAt));
+}
+
+export async function getBundleList() {
+  if (!isDatabaseConfigured()) {
+    return [];
+  }
+
+  await ensureCommerceSchema();
+  return db.select().from(bundles).orderBy(desc(bundles.createdAt));
 }
