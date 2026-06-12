@@ -15,5 +15,7 @@
   "typescript.tsserver.maxTsServerMemory": 8192,
   "typescript.tsdk": "node_modules/typescript/lib",
   "typescript.suggest.autoImports": true,
-  "typescript.preferences.includePackageJsonAutoImports": "auto"
+  "typescript.preferences.includePackageJsonAutoImports": "auto",
+  "editor.fontFamily": "Fira Code",
+  "editor.fontLigatures": true
 }

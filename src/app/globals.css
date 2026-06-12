@@ -13,7 +13,10 @@ html {
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at top, rgba(212, 106, 70, 0.08), transparent 22%),
+    radial-gradient(circle at bottom right, rgba(138, 170, 93, 0.08), transparent 22%),
+    var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), Arial, sans-serif;
 }
@@ -125,6 +128,20 @@ body {
   background: var(--surface);
 }
 
+.glass-panel {
+  border: 1px solid color-mix(in srgb, white 60%, transparent);
+  background: color-mix(in srgb, white 78%, transparent);
+  backdrop-filter: blur(22px);
+  box-shadow: 0 24px 80px -36px rgba(15, 23, 15, 0.45);
+}
+
+.glass-panel-dark {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(6, 14, 10, 0.38);
+  backdrop-filter: blur(24px);
+  box-shadow: 0 30px 90px -40px rgba(0, 0, 0, 0.85);
+}
+
 .filter-chip {
   @apply rounded-lg border px-4 py-2 text-sm font-medium transition-colors;
   border-color: var(--border);
@@ -183,6 +200,15 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--primary);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

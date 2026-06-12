@@ -1,22 +1,29 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import AuthOptions from "@/components/auth/AuthOptions";
 import { signIn, signUp } from "@/lib/auth-client";
 
 type Props = {
   mode: "login" | "signup";
   audience?: "user" | "admin";
   redirectTo?: string;
+  googleAuthEnabled?: boolean;
+  phoneAuthEnabled?: boolean;
 };
 
 export default function LoginCardSection({
   mode,
   audience = "user",
   redirectTo = audience === "admin" ? "/admin" : "/profile",
+  googleAuthEnabled = false,
+  phoneAuthEnabled = false,
 }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -27,10 +34,37 @@ export default function LoginCardSection({
 
   const isSignup = mode === "signup";
 
+  useEffect(() => {
+    if (searchParams.get("provider") !== "google") {
+      return;
+    }
+
+    if (!googleAuthEnabled) {
+      setError("Google sign-in is not configured yet. You can continue with email and password for now.");
+      return;
+    }
+
+    const startGoogleSignIn = async () => {
+      setGoogleLoading(true);
+      try {
+        await signIn.social({
+          provider: "google",
+          callbackURL: redirectTo,
+          newUserCallbackURL: redirectTo,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Google sign-in failed");
+        setGoogleLoading(false);
+      }
+    };
+
+    void startGoogleSignIn();
+  }, [googleAuthEnabled, redirectTo, searchParams]);
+
   return (
-    <section className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,106,0,0.18),_transparent_32%),linear-gradient(135deg,#0f160f_0%,#18331d_50%,#efe2d3_50%,#f8f4ee_100%)] px-4 py-24">
+    <section className="relative overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(212,106,70,0.2),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(124,152,76,0.18),_transparent_24%),linear-gradient(135deg,#0d1610_0%,#17311d_42%,#efe2d3_42%,#f8f4ee_100%)] px-4 py-24">
       <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="rounded-[2.5rem] border border-white/10 bg-black/20 p-8 text-white backdrop-blur">
+        <div className="glass-panel-dark rounded-[2.5rem] p-8 text-white">
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/65">
             {audience === "admin" ? "Secure Admin Access" : "Optional Account"}
           </p>
@@ -44,7 +78,7 @@ export default function LoginCardSection({
           </p>
         </div>
 
-        <div className="rounded-[2.5rem] border border-[var(--border)] bg-white/88 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.14)] backdrop-blur">
+        <div className="glass-panel rounded-[2.5rem] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.14)]">
           <h2 className="text-3xl font-semibold text-[#16311a]">
             {isSignup ? "Create account" : "Welcome back"}
           </h2>
@@ -55,6 +89,20 @@ export default function LoginCardSection({
           {error ? (
             <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
+            </div>
+          ) : null}
+
+          {audience !== "admin" ? (
+            <div className="mt-8">
+              <AuthOptions
+                googleAuthEnabled={googleAuthEnabled}
+                phoneAuthEnabled={phoneAuthEnabled}
+                redirectTo={redirectTo}
+                onError={setError}
+                onGoogleLoading={setGoogleLoading}
+                googleLoading={googleLoading}
+                showGuest
+              />
             </div>
           ) : null}
 
@@ -88,7 +136,7 @@ export default function LoginCardSection({
                 setLoading(false);
               }
             }}
-            className="mt-8 space-y-4"
+            className="mt-6 space-y-4"
           >
             {isSignup ? (
               <input

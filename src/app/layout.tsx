@@ -11,8 +11,8 @@ import { buildSiteThemeVariables } from "@/lib/theme";
 import ThemeProvider from "@/theme/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "MATVerse | Eco-Friendly Modern Commerce",
-  description: "MATVerse is a production-ready eco-friendly commerce experience for curated home, lifestyle, fashion, and tech essentials.",
+  title: "MATVerse | Online Marketplace",
+  description: "MATVerse is a general ecommerce marketplace for electronics, fashion, grocery, home, beauty, sports, baby products, eco-friendly picks, and more.",
   icons: {
     icon: "/logo.png",
   },

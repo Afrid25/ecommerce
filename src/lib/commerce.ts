@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, ilike, inArray, sql } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 import {
+  createTransactionalDb,
   db,
   describeDatabaseFailure,
   isDatabaseConfigured,
@@ -21,6 +22,7 @@ import {
   siteSettings,
 } from "@/lib/db/schema";
 import { defaultHomepageSettings, defaultSiteSettings, seededProducts } from "@/lib/matverse-data";
+import { applyOfferPricingToProduct, isOfferActive } from "@/lib/pricing";
 
 export type OrderPayload = {
   customerName: string;
@@ -48,6 +50,7 @@ type LockedProduct = {
   name: string;
   image: string;
   price: number;
+  compareAtPrice?: number | null;
   costPrice: number;
   stock: number;
 };
@@ -106,8 +109,80 @@ function isMissingRelationError(error: unknown) {
     return false;
   }
 
-  const record = error as { cause?: { code?: string } };
-  return record.cause?.code === "42P01";
+  const record = error as { code?: string; cause?: { code?: string } };
+  return record.code === "42P01" || record.cause?.code === "42P01";
+}
+
+async function backfillLegacyOrderItems() {
+  const legacyOrderColumnsResult = await db.execute(sql`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'orders'
+      AND column_name IN ('product_id', 'quantity')
+  `);
+
+  const legacyOrderColumns = new Set(
+    legacyOrderColumnsResult.rows.map((row) => String((row as Record<string, unknown>).column_name))
+  );
+
+  if (!legacyOrderColumns.has("product_id") || !legacyOrderColumns.has("quantity")) {
+    return;
+  }
+
+  await db.execute(sql`
+    INSERT INTO order_items (
+      order_id,
+      product_id,
+      quantity,
+      unit_price,
+      total_price,
+      product_name,
+      product_image
+    )
+    SELECT
+      o.id,
+      o.product_id,
+      GREATEST(COALESCE(o.quantity, 1), 1),
+      CASE
+        WHEN COALESCE(o.quantity, 0) > 0
+          THEN COALESCE(o.total_price, 0) / o.quantity
+        ELSE COALESCE(o.total_price, 0)
+      END,
+      COALESCE(o.total_price, 0),
+      COALESCE(p.name, 'Legacy product'),
+      COALESCE(p.image, '')
+    FROM orders o
+    LEFT JOIN products p ON p.id = o.product_id
+    LEFT JOIN order_items oi ON oi.order_id = o.id
+    WHERE o.product_id IS NOT NULL
+      AND o.quantity IS NOT NULL
+      AND oi.id IS NULL;
+  `);
+}
+
+async function relaxLegacyOrderColumns() {
+  const legacyOrderColumnsResult = await db.execute(sql`
+    SELECT column_name, is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'orders'
+      AND column_name IN ('product_id', 'quantity')
+  `);
+
+  const blockingColumns = new Set(
+    legacyOrderColumnsResult.rows
+      .filter((row) => String((row as Record<string, unknown>).is_nullable) === "NO")
+      .map((row) => String((row as Record<string, unknown>).column_name))
+  );
+
+  if (blockingColumns.has("product_id")) {
+    await db.execute(sql`ALTER TABLE orders ALTER COLUMN product_id DROP NOT NULL;`);
+  }
+
+  if (blockingColumns.has("quantity")) {
+    await db.execute(sql`ALTER TABLE orders ALTER COLUMN quantity DROP NOT NULL;`);
+  }
 }
 
 function normalizeLockedProduct(row: unknown): LockedProduct | null {
@@ -120,6 +195,10 @@ function normalizeLockedProduct(row: unknown): LockedProduct | null {
   const name = typeof record.name === "string" ? record.name : "";
   const image = typeof record.image === "string" ? record.image : "";
   const price = Number(record.price);
+  const compareAtPrice =
+    record.compare_at_price === null || record.compare_at_price === undefined
+      ? null
+      : Number(record.compare_at_price);
   const costPrice = Number(record.cost_price ?? record.costPrice ?? 0);
   const stock = Number(record.stock);
 
@@ -127,7 +206,15 @@ function normalizeLockedProduct(row: unknown): LockedProduct | null {
     return null;
   }
 
-  return { id, name, image, price, costPrice, stock };
+  return {
+    id,
+    name,
+    image,
+    price,
+    compareAtPrice: compareAtPrice !== null && !Number.isNaN(compareAtPrice) ? compareAtPrice : null,
+    costPrice,
+    stock,
+  };
 }
 
 function buildOrderId() {
@@ -219,6 +306,26 @@ export async function ensureCommerceSchema(options?: { throwOnError?: boolean; r
 
   try {
     await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS products (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        description text NOT NULL,
+        price real NOT NULL,
+        compare_at_price real,
+        cost_price real NOT NULL DEFAULT 0,
+        image text NOT NULL,
+        category text NOT NULL,
+        category_slug text NOT NULL DEFAULT '',
+        stock integer NOT NULL DEFAULT 0,
+        is_featured boolean NOT NULL DEFAULT false,
+        is_trending boolean NOT NULL DEFAULT false,
+        is_hot boolean NOT NULL DEFAULT false,
+        is_limited boolean NOT NULL DEFAULT false,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
       CREATE TABLE IF NOT EXISTS categories (
         id serial PRIMARY KEY,
         name text NOT NULL,
@@ -227,6 +334,59 @@ export async function ensureCommerceSchema(options?: { throwOnError?: boolean; r
         description text NOT NULL,
         created_at timestamp DEFAULT now() NOT NULL
       );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS orders (
+        id serial PRIMARY KEY,
+        order_id text NOT NULL,
+        user_id text,
+        customer_name text NOT NULL,
+        customer_email text,
+        phone text NOT NULL,
+        address text NOT NULL,
+        payment_method text NOT NULL,
+        source text NOT NULL DEFAULT 'online',
+        order_status text NOT NULL DEFAULT 'pending',
+        notes text,
+        total_price real NOT NULL DEFAULT 0,
+        total_cost real NOT NULL DEFAULT 0,
+        profit real NOT NULL DEFAULT 0,
+        created_at timestamp DEFAULT now() NOT NULL
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS order_items (
+        id serial PRIMARY KEY,
+        order_id integer NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+        product_id integer NOT NULL REFERENCES products(id),
+        quantity integer NOT NULL,
+        unit_price real NOT NULL,
+        total_price real NOT NULL,
+        product_name text NOT NULL DEFAULT '',
+        product_image text NOT NULL DEFAULT ''
+      );
+    `);
+
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS orders_order_id_idx ON orders (order_id);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS orders_status_idx ON orders (order_status);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS orders_created_at_idx ON orders (created_at);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS order_items_order_idx ON order_items (order_id);
+    `);
+
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS order_items_product_idx ON order_items (product_id);
     `);
 
     await db.execute(sql`
@@ -276,12 +436,22 @@ export async function ensureCommerceSchema(options?: { throwOnError?: boolean; r
         id serial PRIMARY KEY,
         title text NOT NULL,
         discount integer NOT NULL DEFAULT 0,
+        discount_type text NOT NULL DEFAULT 'percentage',
         product_ids text NOT NULL DEFAULT '',
+        image text NOT NULL DEFAULT '',
+        priority integer NOT NULL DEFAULT 0,
         start_date timestamp,
         end_date timestamp,
         is_active boolean NOT NULL DEFAULT true,
         created_at timestamp DEFAULT now() NOT NULL
       );
+    `);
+
+    await db.execute(sql`
+      ALTER TABLE offers
+      ADD COLUMN IF NOT EXISTS discount_type text DEFAULT 'percentage',
+      ADD COLUMN IF NOT EXISTS image text DEFAULT '',
+      ADD COLUMN IF NOT EXISTS priority integer DEFAULT 0;
     `);
 
     await db.execute(sql`
@@ -298,7 +468,7 @@ export async function ensureCommerceSchema(options?: { throwOnError?: boolean; r
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS cart_upsells (
         id serial PRIMARY KEY,
-        product_id integer REFERENCES products(id) ON DELETE CASCADE,
+        product_id integer NOT NULL REFERENCES products(id) ON DELETE CASCADE,
         discount integer NOT NULL DEFAULT 0,
         is_active boolean NOT NULL DEFAULT true,
         created_at timestamp DEFAULT now() NOT NULL
@@ -308,8 +478,8 @@ export async function ensureCommerceSchema(options?: { throwOnError?: boolean; r
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS product_recommendations (
         id serial PRIMARY KEY,
-        product_id integer REFERENCES products(id) ON DELETE CASCADE,
-        recommended_product_id integer REFERENCES products(id) ON DELETE CASCADE,
+        product_id integer NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        recommended_product_id integer NOT NULL REFERENCES products(id) ON DELETE CASCADE,
         created_at timestamp DEFAULT now() NOT NULL
       );
     `);
@@ -317,7 +487,7 @@ export async function ensureCommerceSchema(options?: { throwOnError?: boolean; r
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS reviews (
         id serial PRIMARY KEY,
-        product_id integer REFERENCES products(id) ON DELETE CASCADE,
+        product_id integer NOT NULL REFERENCES products(id) ON DELETE CASCADE,
         user_id text,
         user_name text NOT NULL,
         rating integer NOT NULL,
@@ -370,6 +540,9 @@ export async function ensureCommerceSchema(options?: { throwOnError?: boolean; r
       ALTER TABLE reviews
       ADD COLUMN IF NOT EXISTS images text DEFAULT '[]';
     `);
+
+    await backfillLegacyOrderItems();
+    await relaxLegacyOrderColumns();
 
     for (const category of categoryDefinitions) {
       await db.execute(sql`
@@ -477,6 +650,7 @@ export async function getSiteSettings() {
 
 export async function createOrder(payload: OrderPayload) {
   let stage = "schema-bootstrap";
+  let transactionalDb: ReturnType<typeof createTransactionalDb> | null = null;
 
   const aggregatedItems = Array.from(
     payload.items.reduce((map, item) => {
@@ -503,13 +677,15 @@ export async function createOrder(payload: OrderPayload) {
   try {
     await ensureCommerceSchema({ throwOnError: true, reason: "create-order" });
     stage = "start-transaction";
-    const createdOrder = await db.transaction(async (tx) => {
+    transactionalDb = createTransactionalDb();
+    const createdOrder = await transactionalDb.db.transaction(async (tx) => {
       const lockedProducts: LockedProduct[] = [];
+      const availableOffers = await tx.select().from(offers);
 
       stage = "lock-products";
       for (const item of aggregatedItems) {
         const result = await tx.execute(sql`
-          SELECT id, name, image, price, cost_price, stock
+          SELECT id, name, image, price, compare_at_price, cost_price, stock
           FROM products
           WHERE id = ${item.productId}
           FOR UPDATE
@@ -547,7 +723,8 @@ export async function createOrder(payload: OrderPayload) {
 
       const totalPrice = aggregatedItems.reduce((sum, item) => {
         const product = lockedProducts.find((entry) => entry.id === item.productId)!;
-        return sum + product.price * item.quantity;
+        const pricedProduct = applyOfferPricingToProduct(product, availableOffers);
+        return sum + pricedProduct.price * item.quantity;
       }, 0);
 
       const totalCost = aggregatedItems.reduce((sum, item) => {
@@ -580,6 +757,7 @@ export async function createOrder(payload: OrderPayload) {
       stage = "write-order-items";
       for (const item of aggregatedItems) {
         const product = lockedProducts.find((entry) => entry.id === item.productId)!;
+        const pricedProduct = applyOfferPricingToProduct(product, availableOffers);
 
         stage = "update-stock";
         await tx
@@ -592,8 +770,8 @@ export async function createOrder(payload: OrderPayload) {
           orderId: created.id,
           productId: product.id,
           quantity: item.quantity,
-          unitPrice: product.price,
-          totalPrice: product.price * item.quantity,
+          unitPrice: pricedProduct.price,
+          totalPrice: pricedProduct.price * item.quantity,
           productName: product.name,
           productImage: product.image,
         });
@@ -638,6 +816,12 @@ export async function createOrder(payload: OrderPayload) {
       `${failure.userMessage} Order creation stopped at stage "${stage}".`,
       failure.diagnostics,
     );
+  } finally {
+    if (transactionalDb) {
+      await transactionalDb.close().catch((closeError) => {
+        console.warn("[ORDER_TRANSACTION_CLOSE_FAILED]", closeError);
+      });
+    }
   }
 }
 
@@ -763,6 +947,7 @@ export async function getActiveUpsells(limit = 4) {
   }
 
   await ensureCommerceSchema();
+  const activeOffers = await getActiveOfferList();
   const upsellRows = await db
     .select()
     .from(cartUpsells)
@@ -774,7 +959,12 @@ export async function getActiveUpsells(limit = 4) {
     return [];
   }
 
-  return db.select().from(products).where(inArray(products.id, upsellRows.map((entry) => entry.productId)));
+  const productRows = await db
+    .select()
+    .from(products)
+    .where(inArray(products.id, upsellRows.map((entry) => entry.productId)));
+
+  return productRows.map((product) => applyOfferPricingToProduct(product, activeOffers));
 }
 
 export async function getRecommendedProducts(productId: number, limit = 4) {
@@ -783,6 +973,7 @@ export async function getRecommendedProducts(productId: number, limit = 4) {
   }
 
   await ensureCommerceSchema();
+  const activeOffers = await getActiveOfferList();
   const recommendationRows = await db
     .select()
     .from(productRecommendations)
@@ -793,10 +984,12 @@ export async function getRecommendedProducts(productId: number, limit = 4) {
     return [];
   }
 
-  return db
+  const productRows = await db
     .select()
     .from(products)
     .where(inArray(products.id, recommendationRows.map((entry) => entry.recommendedProductId)));
+
+  return productRows.map((product) => applyOfferPricingToProduct(product, activeOffers));
 }
 
 export async function getOfferList() {
@@ -805,7 +998,12 @@ export async function getOfferList() {
   }
 
   await ensureCommerceSchema();
-  return db.select().from(offers).orderBy(desc(offers.createdAt));
+  return db.select().from(offers).orderBy(desc(offers.priority), desc(offers.createdAt));
+}
+
+export async function getActiveOfferList(now = new Date()) {
+  const rows = await getOfferList();
+  return rows.filter((offer) => isOfferActive(offer, now));
 }
 
 export async function getBundleList() {

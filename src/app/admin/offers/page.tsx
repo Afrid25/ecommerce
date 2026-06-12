@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminShell from "@/components/AdminShell";
 import { AdminField, adminInputClassName } from "@/components/admin/AdminField";
+import AdminImageField from "@/components/admin/AdminImageField";
 import { useSession } from "@/lib/auth-client";
 import { useToastStore } from "@/store/toast";
 
@@ -10,7 +11,10 @@ type Offer = {
   id: number;
   title: string;
   discount: number;
+  discountType: "percentage" | "fixed";
   productIds: string;
+  image: string;
+  priority: number;
   startDate: string | null;
   endDate: string | null;
   isActive: boolean;
@@ -24,7 +28,10 @@ type Product = {
 const emptyForm = {
   title: "",
   discount: 10,
+  discountType: "percentage" as "percentage" | "fixed",
   productIds: [] as number[],
+  image: "",
+  priority: 0,
   startDate: "",
   endDate: "",
   isActive: true,
@@ -131,19 +138,70 @@ export default function AdminOffersPage() {
             </AdminField>
 
             <AdminField
-              label="Discount Percentage"
-              helperText="Example: 15. This percentage is applied to all products attached to the offer."
+              label="Discount Logic"
+              helperText="Choose whether this campaign reduces the price by a percentage or a fixed amount."
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm">
+                  <input
+                    type="radio"
+                    checked={form.discountType === "percentage"}
+                    onChange={() => setForm({ ...form, discountType: "percentage" })}
+                  />
+                  Percentage Off
+                </label>
+                <label className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm">
+                  <input
+                    type="radio"
+                    checked={form.discountType === "fixed"}
+                    onChange={() => setForm({ ...form, discountType: "fixed" })}
+                  />
+                  Fixed Amount Off
+                </label>
+              </div>
+            </AdminField>
+
+            <AdminField
+              label={form.discountType === "fixed" ? "Discount Amount" : "Discount Percentage"}
+              helperText={
+                form.discountType === "fixed"
+                  ? "Example: 250. This subtracts a fixed amount from each attached product."
+                  : "Example: 15. This percentage is applied to all products attached to the offer."
+              }
             >
               <input
                 type="number"
                 min={1}
-                max={90}
+                max={form.discountType === "percentage" ? 90 : undefined}
                 value={form.discount}
                 onChange={(event) => setForm({ ...form, discount: Number(event.target.value) || 0 })}
                 placeholder="Enter discount percentage"
                 className={adminInputClassName}
               />
             </AdminField>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <AdminField
+                label="Banner Priority"
+                helperText="Higher priority campaigns appear first on the storefront."
+              >
+                <input
+                  type="number"
+                  min={0}
+                  value={form.priority}
+                  onChange={(event) => setForm({ ...form, priority: Number(event.target.value) || 0 })}
+                  className={adminInputClassName}
+                />
+              </AdminField>
+              <AdminImageField
+                label="Campaign Image"
+                value={form.image}
+                onChange={(image) => setForm({ ...form, image })}
+                uploadFolder="campaigns"
+                helperText="Optional image for the homepage promo rail and campaign cards."
+                placeholder="Enter campaign image URL or upload one"
+              />
+            </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <AdminField
@@ -246,11 +304,14 @@ export default function AdminOffersPage() {
                   <h3 className="mt-2 text-xl font-semibold">{offer.title}</h3>
                 </div>
                 <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold">
-                  {offer.discount}% off
+                  {offer.discountType === "fixed" ? `Tk ${offer.discount} off` : `${offer.discount}% off`}
                 </span>
               </div>
               <p className="mt-3 text-sm text-[var(--text-secondary)]">
                 Products: {parseIdList(offer.productIds).length} attached
+              </p>
+              <p className="mt-2 text-xs uppercase tracking-[0.16em] text-[var(--text-secondary)]">
+                Priority {offer.priority}
               </p>
               <div className="mt-4 flex gap-3">
                 <button
@@ -259,7 +320,10 @@ export default function AdminOffersPage() {
                     setForm({
                       title: offer.title,
                       discount: offer.discount,
+                      discountType: offer.discountType ?? "percentage",
                       productIds: parseIdList(offer.productIds),
+                      image: offer.image ?? "",
+                      priority: offer.priority ?? 0,
                       startDate: offer.startDate ? new Date(offer.startDate).toISOString().slice(0, 10) : "",
                       endDate: offer.endDate ? new Date(offer.endDate).toISOString().slice(0, 10) : "",
                       isActive: offer.isActive,

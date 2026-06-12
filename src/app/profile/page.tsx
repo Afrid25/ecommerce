@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signOut, useSession } from "@/lib/auth-client";
 import { formatCurrency } from "@/lib/format";
+import { useCartStore } from "@/store/cart";
 
 type Order = {
   id: number;
@@ -18,6 +19,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const [orders, setOrders] = useState<Order[]>([]);
+  const wishlistCount = useCartStore((state) => state.wishlist.length);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -42,13 +44,32 @@ export default function ProfilePage() {
     return null;
   }
 
+  const totalSpent = orders.reduce((sum, order) => sum + Number(order.totalPrice), 0);
+  const completedOrders = orders.filter((order) => order.orderStatus === "delivered" || order.orderStatus === "confirmed").length;
+  const recentOrder = orders[0];
+  const purchaseFrequencyLabel =
+    orders.length >= 6 ? "Highly active" : orders.length >= 3 ? "Returning shopper" : orders.length > 0 ? "Early relationship" : "New profile";
+
   return (
     <div className="container-nike py-28">
-      <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
-        <section className="rounded-[2.5rem] border border-[var(--border)] bg-[var(--surface)] p-8">
+      <div className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr]">
+        <section className="glass-panel rounded-[2.5rem] px-8 py-8">
           <p className="section-eyebrow">Profile</p>
           <h1 className="mt-4 text-4xl font-semibold">{session.user.name}</h1>
           <p className="mt-3 text-sm text-[var(--text-secondary)]">{session.user.email}</p>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            {[
+              ["Total spent", formatCurrency(totalSpent)],
+              ["Completed orders", String(completedOrders)],
+              ["Saved items", String(wishlistCount)],
+              ["Offer eligibility", totalSpent >= 10000 ? "Priority offers" : "Growing profile"],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-[1.5rem] border border-white/40 bg-white/55 px-4 py-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">{label}</p>
+                <p className="mt-2 text-2xl font-semibold text-[#16311a]">{value}</p>
+              </div>
+            ))}
+          </div>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/shop" className="rounded-full bg-[#16311a] px-5 py-3 text-sm font-semibold text-white">
               Continue Shopping
@@ -60,9 +81,20 @@ export default function ProfilePage() {
               Sign Out
             </button>
           </div>
+          <div className="mt-8 rounded-[1.8rem] border border-white/40 bg-black/[0.02] px-5 py-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              Shopping Profile
+            </p>
+            <p className="mt-2 text-lg font-semibold text-[#16311a]">{purchaseFrequencyLabel}</p>
+            <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+              {recentOrder
+                ? `Your latest order was placed on ${new Date(recentOrder.createdAt).toLocaleDateString()}. We use your account history to keep checkout smoother and future offers more relevant.`
+                : "Once your first account-linked order is placed, this profile will begin surfacing shopping history and personalized offer signals."}
+            </p>
+          </div>
         </section>
 
-        <section className="rounded-[2.5rem] border border-[var(--border)] bg-white p-8 shadow-[var(--shadow-soft)]">
+        <section className="glass-panel rounded-[2.5rem] px-8 py-8">
           <div className="flex items-center justify-between">
             <div>
               <p className="section-eyebrow">Order History</p>
@@ -74,7 +106,7 @@ export default function ProfilePage() {
           </div>
           <div className="mt-8 space-y-4">
             {orders.length > 0 ? orders.map((order) => (
-              <article key={order.id} className="rounded-[2rem] bg-[var(--surface)] p-5">
+              <article key={order.id} className="rounded-[2rem] border border-white/40 bg-white/60 p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="font-mono text-xs">{order.orderId}</p>
@@ -87,7 +119,7 @@ export default function ProfilePage() {
                 </div>
               </article>
             )) : (
-              <div className="rounded-[2rem] bg-[var(--surface)] p-5 text-sm text-[var(--text-secondary)]">
+              <div className="rounded-[2rem] border border-white/40 bg-white/60 p-5 text-sm text-[var(--text-secondary)]">
                 No account-linked orders yet. Guest checkout still works even without logging in.
               </div>
             )}

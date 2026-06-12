@@ -1,6 +1,8 @@
-import { neon } from "@neondatabase/serverless";
+import { Pool, neon, neonConfig } from "@neondatabase/serverless";
 import { sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle as drizzleHttp } from "drizzle-orm/neon-http";
+import { drizzle as drizzleServerless } from "drizzle-orm/neon-serverless";
+import WebSocket from "ws";
 import { z } from "zod";
 import * as schema from "./schema";
 
@@ -46,6 +48,10 @@ export type DatabaseHealthReport = {
     ordersTableExists: boolean;
     ordersTableMatchesSchema: boolean;
     missingOrderColumns: string[];
+    orderItemsTableExists: boolean;
+    orderItemsTableMatchesSchema: boolean;
+    missingOrderItemColumns: string[];
+    blockingLegacyOrderColumns: string[];
   };
   diagnostics?: {
     errorChain: string[];
@@ -69,6 +75,17 @@ const EXPECTED_ORDER_COLUMNS = [
   "total_cost",
   "profit",
   "created_at",
+] as const;
+
+const EXPECTED_ORDER_ITEM_COLUMNS = [
+  "id",
+  "order_id",
+  "product_id",
+  "quantity",
+  "unit_price",
+  "total_price",
+  "product_name",
+  "product_image",
 ] as const;
 
 const DATABASE_ENV_HINT =
@@ -113,8 +130,12 @@ const databaseUrlSchema = z
     }
   });
 
-let dbInstance: ReturnType<typeof drizzle<typeof schema>> | null = null;
+type HttpDatabase = ReturnType<typeof drizzleHttp<typeof schema>>;
+type TransactionalDatabase = ReturnType<typeof drizzleServerless<typeof schema>>;
+
+let dbInstance: HttpDatabase | null = null;
 let parsedDatabaseConfig: ParsedDatabaseConfig | null = null;
+let neonServerlessConfigured = false;
 
 function summarizeDatabaseUrl(urlValue?: string): DatabaseConfigSummary {
   const trimmed = urlValue?.trim() ?? "";
@@ -238,7 +259,21 @@ export function collectErrorMessages(error: unknown) {
   return messages;
 }
 
+function extractDatabaseErrorCode(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  const record = error as { code?: string; cause?: { code?: string } };
+  return record.code ?? record.cause?.code;
+}
+
 export function isDatabaseReachabilityError(error: unknown) {
+  const code = extractDatabaseErrorCode(error);
+  if (code === "ECONNREFUSED" || code === "ECONNRESET" || code === "ENOTFOUND" || code === "EACCES") {
+    return true;
+  }
+
   const combined = collectErrorMessages(error).join(" ").toLowerCase();
   return [
     "fetch failed",
@@ -293,15 +328,47 @@ export function logDatabaseError(
   return failure;
 }
 
+function ensureNeonServerlessWebSocket() {
+  if (neonServerlessConfigured) {
+    return;
+  }
+
+  if (typeof globalThis.WebSocket === "undefined") {
+    neonConfig.webSocketConstructor = WebSocket;
+  }
+
+  neonServerlessConfigured = true;
+}
+
 export function getDb() {
   const { url } = getParsedDatabaseConfig();
 
   if (!dbInstance) {
     const databaseClient = neon(url);
-    dbInstance = drizzle(databaseClient, { schema });
+    dbInstance = drizzleHttp(databaseClient, { schema });
   }
 
   return dbInstance;
+}
+
+export function createTransactionalDb(): {
+  db: TransactionalDatabase;
+  close: () => Promise<void>;
+} {
+  const { url } = getParsedDatabaseConfig();
+  ensureNeonServerlessWebSocket();
+
+  const pool = new Pool({
+    connectionString: url,
+  });
+  const db = drizzleServerless(pool, { schema });
+
+  return {
+    db,
+    close: async () => {
+      await pool.end();
+    },
+  };
 }
 
 export const db = new Proxy(
@@ -312,7 +379,7 @@ export const db = new Proxy(
       return database[prop];
     },
   }
-) as ReturnType<typeof drizzle<typeof schema>>;
+) as HttpDatabase;
 
 export async function getDatabaseHealth(): Promise<DatabaseHealthReport> {
   const startedAt = Date.now();
@@ -329,6 +396,10 @@ export async function getDatabaseHealth(): Promise<DatabaseHealthReport> {
         ordersTableExists: false,
         ordersTableMatchesSchema: false,
         missingOrderColumns: [...EXPECTED_ORDER_COLUMNS],
+        orderItemsTableExists: false,
+        orderItemsTableMatchesSchema: false,
+        missingOrderItemColumns: [...EXPECTED_ORDER_ITEM_COLUMNS],
+        blockingLegacyOrderColumns: [],
       },
     };
   }
@@ -345,35 +416,78 @@ export async function getDatabaseHealth(): Promise<DatabaseHealthReport> {
       (ordersTableResult.rows[0] as Record<string, unknown> | undefined)?.table_name
     );
 
-    const orderColumnsResult = await database.execute(sql`
-      SELECT column_name
+    const orderItemsTableResult = await database.execute(sql`
+      SELECT to_regclass('public.order_items') AS table_name
+    `);
+    const orderItemsTableExists = Boolean(
+      (orderItemsTableResult.rows[0] as Record<string, unknown> | undefined)?.table_name
+    );
+
+    const tableColumnsResult = await database.execute(sql`
+      SELECT table_name, column_name
       FROM information_schema.columns
-      WHERE table_schema = 'public' AND table_name = 'orders'
-      ORDER BY ordinal_position
+      WHERE table_schema = 'public' AND table_name IN ('orders', 'order_items')
+      ORDER BY table_name, ordinal_position
     `);
 
-    const availableOrderColumns = orderColumnsResult.rows.map((row) =>
-      String((row as Record<string, unknown>).column_name)
+    const availableColumnsByTable = tableColumnsResult.rows.reduce<Record<string, string[]>>(
+      (accumulator, row) => {
+        const record = row as Record<string, unknown>;
+        const tableName = String(record.table_name);
+        const columnName = String(record.column_name);
+        accumulator[tableName] = [...(accumulator[tableName] ?? []), columnName];
+        return accumulator;
+      },
+      {}
     );
+    const availableOrderColumns = availableColumnsByTable.orders ?? [];
     const missingOrderColumns = EXPECTED_ORDER_COLUMNS.filter(
       (column) => !availableOrderColumns.includes(column)
     );
+    const availableOrderItemColumns = availableColumnsByTable.order_items ?? [];
+    const missingOrderItemColumns = EXPECTED_ORDER_ITEM_COLUMNS.filter(
+      (column) => !availableOrderItemColumns.includes(column)
+    );
+    const legacyOrderColumnsResult = await database.execute(sql`
+      SELECT column_name, is_nullable
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'orders'
+        AND column_name IN ('product_id', 'quantity')
+    `);
+    const blockingLegacyOrderColumns = legacyOrderColumnsResult.rows
+      .filter((row) => String((row as Record<string, unknown>).is_nullable) === "NO")
+      .map((row) => String((row as Record<string, unknown>).column_name));
+    const orderTablesMatchSchema =
+      ordersTableExists &&
+      missingOrderColumns.length === 0 &&
+      orderItemsTableExists &&
+      missingOrderItemColumns.length === 0 &&
+      blockingLegacyOrderColumns.length === 0;
 
     return {
-      ok: ordersTableExists && missingOrderColumns.length === 0,
+      ok: orderTablesMatchSchema,
       latencyMs: Date.now() - startedAt,
       message:
-        ordersTableExists && missingOrderColumns.length === 0
-          ? "Database is reachable and the orders table matches the expected schema."
-          : ordersTableExists
-            ? "Database is reachable, but the orders table is missing expected columns."
-            : "Database is reachable, but the orders table does not exist.",
+        orderTablesMatchSchema
+          ? "Database is reachable and the order tables match the expected schema."
+          : !ordersTableExists
+            ? "Database is reachable, but the orders table does not exist."
+            : !orderItemsTableExists
+              ? "Database is reachable, but the order_items table does not exist."
+              : blockingLegacyOrderColumns.length > 0
+                ? "Database is reachable, but legacy orders columns are still blocking normalized order inserts."
+              : "Database is reachable, but one or more order tables are missing expected columns.",
       config,
       checks: {
         connection: true,
         ordersTableExists,
         ordersTableMatchesSchema: ordersTableExists && missingOrderColumns.length === 0,
         missingOrderColumns,
+        orderItemsTableExists,
+        orderItemsTableMatchesSchema: orderItemsTableExists && missingOrderItemColumns.length === 0,
+        missingOrderItemColumns,
+        blockingLegacyOrderColumns,
       },
     };
   } catch (error) {
@@ -389,6 +503,10 @@ export async function getDatabaseHealth(): Promise<DatabaseHealthReport> {
         ordersTableExists: false,
         ordersTableMatchesSchema: false,
         missingOrderColumns: [...EXPECTED_ORDER_COLUMNS],
+        orderItemsTableExists: false,
+        orderItemsTableMatchesSchema: false,
+        missingOrderItemColumns: [...EXPECTED_ORDER_ITEM_COLUMNS],
+        blockingLegacyOrderColumns: [],
       },
       diagnostics: {
         errorChain: failure.diagnostics.errorChain,

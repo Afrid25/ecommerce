@@ -13,4 +13,12 @@ export interface Product {
   isTrending?: boolean;
   isHot?: boolean;
   isLimited?: boolean;
+  activeOffer?: {
+    id: number;
+    title: string;
+    discount: number;
+    discountType: "percentage" | "fixed";
+    image: string | null;
+    priority: number;
+  } | null;
 }

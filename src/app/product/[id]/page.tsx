@@ -25,7 +25,15 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
   }
 
   const enhancement = getProductEnhancement(product);
+  const activeOffer =
+    "activeOffer" in product && product.activeOffer && typeof product.activeOffer === "object"
+      ? (product.activeOffer as { title?: string | null })
+      : null;
   const approvedReviews = await getApprovedProductReviews(Number(product.id));
+  const discountPercent =
+    typeof product.compareAtPrice === "number" && product.compareAtPrice > product.price
+      ? Math.round(((product.compareAtPrice - product.price) / product.compareAtPrice) * 100)
+      : 0;
   const recommendedProducts = await getRecommendedProducts(Number(product.id));
   const relatedCatalog =
     recommendedProducts.length === 0
@@ -114,8 +122,18 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
               </p>
               <p className="mt-2 text-4xl font-bold">{formatCurrency(product.price)}</p>
               {typeof product.compareAtPrice === "number" && product.compareAtPrice > product.price ? (
-                <p className="mt-2 text-sm text-[var(--text-secondary)] line-through">
-                  {formatCurrency(product.compareAtPrice)}
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-[var(--text-secondary)] line-through">
+                    {formatCurrency(product.compareAtPrice)}
+                  </p>
+                  <span className="rounded-full bg-[#FF6A00]/10 px-3 py-1 text-xs font-semibold text-[#C65300]">
+                    {discountPercent}% off
+                  </span>
+                </div>
+              ) : null}
+              {activeOffer?.title ? (
+                <p className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#D46A46]">
+                  {activeOffer.title}
                 </p>
               ) : null}
             </div>
@@ -162,24 +180,29 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             <ProductDetailActions product={product} />
           </div>
 
-          <div className="mt-8 rounded-[28px] bg-[var(--surface)] p-6">
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            {[
+              ["Delivery", "Nationwide delivery placeholder. Carrier rates and delivery windows will connect to logistics later."],
+              ["Returns", "7-day return policy placeholder. Final eligibility rules will be configured by operations."],
+              ["Seller", "MATVerse Official Store. Seller score, response rate, and shop chat hooks can be added here."],
+            ].map(([title, text]) => (
+              <div key={title} className="rounded-[24px] bg-[var(--surface)] p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
+                  {title}
+                </p>
+                <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{text}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-[28px] bg-[var(--surface)] p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
-              Payment Methods
+              Payment
             </p>
-            <div className="mt-4 grid gap-3">
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <span>Cash on Delivery</span>
-                <span className="text-[var(--text-secondary)]">Nationwide</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <span>bKash Merchant</span>
-                <span className="text-[var(--text-secondary)]">OTP Verified</span>
-              </div>
-              <div className="flex items-center justify-between gap-4 text-sm">
-                <span>Nagad Merchant</span>
-                <span className="text-[var(--text-secondary)]">OTP Verified</span>
-              </div>
-            </div>
+            <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+              Cash on Delivery is available now. SSLCommerz, Stripe, and mobile banking slots are
+              reserved for future gateway integration.
+            </p>
           </div>
 
           <div className="mt-6 rounded-[28px] bg-[var(--surface)] p-6">
@@ -204,6 +227,15 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       </div>
 
       <ProductReviewsSection productId={Number(product.id)} reviews={approvedReviews} />
+
+      <section className="mt-10 rounded-[28px] border border-dashed border-[var(--border)] bg-white/70 p-6 dark:bg-white/5">
+        <p className="section-eyebrow">Reviews and ratings</p>
+        <h2 className="mt-3 text-2xl font-semibold">Customer proof will live here.</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
+          Rating breakdowns, verified-purchase badges, media reviews, and review sorting are ready
+          to be layered on top of the existing reviews module.
+        </p>
+      </section>
 
       {relatedProducts.length > 0 ? (
         <section className="mt-16">

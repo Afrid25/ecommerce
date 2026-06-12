@@ -1,4 +1,7 @@
 import Link from "next/link";
+import CategoryNav from "@/components/commerce/CategoryNav";
+import EmptyState from "@/components/commerce/EmptyState";
+import SearchBar from "@/components/commerce/SearchBar";
 import ProductCard from "@/components/ProductCard";
 import { getCatalog } from "@/lib/catalog";
 
@@ -26,6 +29,13 @@ function createShopHref(params: Record<string, string | undefined>) {
   return query ? `/shop?${query}` : "/shop";
 }
 
+const sortOptions = [
+  ["Popular", "popular"],
+  ["Newest", "newest"],
+  ["Price low to high", "price-asc"],
+  ["Price high to low", "price-desc"],
+] as const;
+
 export default async function ShopPage({ searchParams }: ShopPageProps) {
   const params = await searchParams;
   const page = params.page ? Number.parseInt(params.page, 10) : 1;
@@ -44,91 +54,104 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   return (
     <div className="min-h-screen bg-[var(--background)] pb-20 pt-28">
       <div className="container-nike">
-        <div className="rounded-[2.5rem] border border-[var(--border)] bg-white px-6 py-8 shadow-[var(--shadow-soft)] md:px-8">
-          <p className="section-eyebrow">Catalog</p>
-          <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <section className="rounded-[32px] border border-[var(--border)] bg-white/82 p-5 shadow-[var(--shadow-soft)] dark:bg-white/5 md:p-7">
+          <div className="grid gap-5 lg:grid-cols-[1fr_auto] lg:items-end">
             <div>
-              <h1 className="font-display text-5xl leading-none md:text-7xl">Shop All</h1>
+              <p className="section-eyebrow">Store</p>
+              <h1 className="mt-2 text-4xl font-semibold leading-tight md:text-5xl">
+                Find products faster
+              </h1>
               <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text-secondary)]">
-                Explore products by category, material, and urgency cues. The catalog now keeps category pages, filters, and stock messaging in sync.
+                Search, filter by category, compare products, and move straight into cart or buy now.
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Link href={createShopHref({ ...params, view: "grid", page: "1" })} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "grid" ? "bg-[var(--primary)] text-white" : "border border-[var(--border)]"}`}>Grid</Link>
-              <Link href={createShopHref({ ...params, view: "list", page: "1" })} className={`rounded-full px-4 py-2 text-sm font-semibold ${view === "list" ? "bg-[var(--primary)] text-white" : "border border-[var(--border)]"}`}>List</Link>
+            <div className="flex gap-2">
+              <Link
+                href={createShopHref({ ...params, view: "grid", page: "1" })}
+                className={`rounded-[14px] px-4 py-3 text-sm font-semibold ${
+                  view === "grid" ? "bg-[#FF6A00] text-white" : "bg-[var(--surface)]"
+                }`}
+              >
+                Grid
+              </Link>
+              <Link
+                href={createShopHref({ ...params, view: "list", page: "1" })}
+                className={`rounded-[14px] px-4 py-3 text-sm font-semibold ${
+                  view === "list" ? "bg-[#FF6A00] text-white" : "bg-[var(--surface)]"
+                }`}
+              >
+                List
+              </Link>
             </div>
           </div>
+          <div className="mt-6">
+            <SearchBar defaultValue={params.search} />
+          </div>
+        </section>
+
+        <div className="mt-6 lg:hidden">
+          <CategoryNav categories={catalog.categories} activeSlug={params.category} />
         </div>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)]">
-          <aside className="rounded-[2rem] border border-[var(--border)] bg-white p-6 shadow-[var(--shadow-soft)] lg:sticky lg:top-28 lg:h-fit">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Filters</h2>
-              <Link href="/shop" className="text-sm text-[var(--primary)]">Reset</Link>
-            </div>
-            <div className="space-y-8">
-              <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">Categories</h3>
-                <div className="flex flex-wrap gap-2">
-                  {catalog.categories.map((category) => (
-                    <Link
-                      key={category.slug}
-                      href={createShopHref({ ...params, category: category.slug, page: "1" })}
-                      className={`rounded-full px-4 py-2 text-sm ${params.category === category.slug ? "bg-[var(--primary)] text-white" : "bg-[var(--surface)] text-[var(--foreground)]"}`}
-                    >
-                      {category.name}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">Materials</h3>
-                <div className="flex flex-wrap gap-2">
-                  {catalog.materials.map((material) => (
-                    <Link
-                      key={material}
-                      href={createShopHref({ ...params, material, page: "1" })}
-                      className="rounded-full bg-[var(--surface)] px-4 py-2 text-sm"
-                    >
-                      {material}
-                    </Link>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">Sort</h3>
-                <div className="grid gap-2">
-                  {[
-                    ["Most Popular", "popular"],
-                    ["Newest", "newest"],
-                    ["Price Low to High", "price-asc"],
-                    ["Price High to Low", "price-desc"],
-                  ].map(([label, value]) => (
-                    <Link key={value} href={createShopHref({ ...params, sort: value, page: "1" })} className="rounded-2xl bg-[var(--surface)] px-4 py-3 text-sm">
-                      {label}
-                    </Link>
-                  ))}
-                </div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <div className="hidden lg:block">
+            <CategoryNav categories={catalog.categories} activeSlug={params.category} />
+            <div className="mt-4 rounded-[24px] border border-[var(--border)] bg-white/75 p-4 shadow-[var(--shadow-soft)] dark:bg-white/5">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+                Materials
+              </h2>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {catalog.materials.map((material) => (
+                  <Link
+                    key={material}
+                    href={createShopHref({ ...params, material, page: "1" })}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold ${
+                      params.material === material ? "bg-[#FF6A00] text-white" : "bg-[var(--surface)]"
+                    }`}
+                  >
+                    {material}
+                  </Link>
+                ))}
               </div>
             </div>
-          </aside>
+          </div>
 
           <section>
-            <div className="mb-5 flex items-center justify-between">
-              <p className="text-sm text-[var(--text-secondary)]">{catalog.pagination.totalItems} products found</p>
-              <p className="text-sm text-[var(--text-secondary)]">Page {catalog.pagination.page} of {catalog.pagination.totalPages}</p>
-            </div>
-            <div className={`grid ${view === "grid" ? "grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4" : "grid-cols-1 gap-6"}`}>
-              {catalog.items.map((product) => (
-                <ProductCard key={product.id} product={product} viewMode={view} />
-              ))}
+            <div className="mb-5 flex flex-col gap-3 rounded-[24px] border border-[var(--border)] bg-white/75 p-4 dark:bg-white/5 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-[var(--text-secondary)]">
+                {catalog.pagination.totalItems} products found
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {sortOptions.map(([label, value]) => (
+                  <Link
+                    key={value}
+                    href={createShopHref({ ...params, sort: value, page: "1" })}
+                    className={`rounded-full px-3 py-2 text-xs font-semibold ${
+                      (params.sort ?? "popular") === value
+                        ? "bg-[#FF6A00] text-white"
+                        : "bg-[var(--surface)]"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </div>
             </div>
 
             {catalog.items.length === 0 ? (
-              <div className="rounded-[2rem] border border-dashed border-[var(--border)] px-6 py-16 text-center text-[var(--text-secondary)]">
-                No products found matching your current filters.
+              <EmptyState
+                title="No products matched your filters"
+                description="Try a broader search, clear the category, or browse all available products."
+                actionHref="/shop"
+                actionLabel="Reset Filters"
+              />
+            ) : (
+              <div className={`grid ${view === "grid" ? "grid-cols-2 gap-4 lg:grid-cols-4" : "grid-cols-1 gap-4"}`}>
+                {catalog.items.map((product) => (
+                  <ProductCard key={product.id} product={product} viewMode={view} />
+                ))}
               </div>
-            ) : null}
+            )}
           </section>
         </div>
       </div>

@@ -23,9 +23,12 @@ export async function PUT(
       .set({
         title: String(body.title ?? "").trim(),
         discount: Number(body.discount ?? 0),
+        discountType: body.discountType === "fixed" ? "fixed" : "percentage",
         productIds: stringifyIdList(
           Array.isArray(body.productIds) ? body.productIds.map((value: unknown) => Number(value)) : []
         ),
+        image: String(body.image ?? "").trim(),
+        priority: Number(body.priority ?? 0),
         startDate: body.startDate ? new Date(body.startDate) : null,
         endDate: body.endDate ? new Date(body.endDate) : null,
         isActive: Boolean(body.isActive),

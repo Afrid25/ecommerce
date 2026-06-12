@@ -2,10 +2,11 @@ import { and, desc, eq, ilike } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { getFallbackCatalogProducts, getFallbackCategoryRecords } from "@/lib/catalog-fallback";
 import { getCategoryBySlug, resolveCategorySlug } from "@/lib/categories";
-import { ensureCommerceSchema, getCategoryRecords } from "@/lib/commerce";
+import { ensureCommerceSchema, getActiveOfferList, getCategoryRecords } from "@/lib/commerce";
 import { db, isDatabaseConfigured } from "@/lib/db";
 import { products } from "@/lib/db/schema";
 import { getMaterialForProduct } from "@/lib/product-content";
+import { applyOfferPricingToProduct } from "@/lib/pricing";
 
 export type CatalogQuery = {
   category?: string;
@@ -111,10 +112,12 @@ export async function getCatalog(query: CatalogQuery = {}) {
   const currentPageSize = normalizePageSize(query.pageSize);
 
   let catalogSource = getFallbackCatalogProducts();
+  let activeOffers: Awaited<ReturnType<typeof getActiveOfferList>> = [];
 
   if (isDatabaseConfigured()) {
     try {
       await ensureCommerceSchema();
+      activeOffers = await getActiveOfferList();
       catalogSource = await db
         .select()
         .from(products)
@@ -132,7 +135,10 @@ export async function getCatalog(query: CatalogQuery = {}) {
     }
   }
 
-  const filteredItems = applyRichFilters(catalogSource, query);
+  const pricedCatalogSource = catalogSource.map((product) =>
+    applyOfferPricingToProduct(product, activeOffers)
+  );
+  const filteredItems = applyRichFilters(pricedCatalogSource, query);
   const paginatedItems = filteredItems.slice(
     (currentPage - 1) * currentPageSize,
     currentPage * currentPageSize
@@ -164,8 +170,9 @@ export async function getProductById(id: number) {
 
   try {
     await ensureCommerceSchema();
+    const activeOffers = await getActiveOfferList();
     const product = await db.select().from(products).where(eq(products.id, id)).limit(1);
-    return product[0] ?? null;
+    return product[0] ? applyOfferPricingToProduct(product[0], activeOffers) : null;
   } catch (error) {
     console.warn("Falling back to local product data:", error);
     return getFallbackCatalogProducts().find((product) => product.id === id) ?? null;

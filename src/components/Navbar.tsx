@@ -10,7 +10,7 @@ import { useHydrated } from "@/hooks/useHydrated";
 
 const navLinks = [
   { href: "/shop", label: "Shop" },
-  { href: "/category/bamboo-products", label: "Categories" },
+  { href: "/#categories", label: "Categories" },
   { href: "/shop?sort=newest", label: "New Arrivals" },
   { href: "/shop?sort=price-desc", label: "Top Picks" },
 ];
@@ -42,12 +42,12 @@ export default function Navbar() {
     <header
       className={`fixed left-0 right-0 z-50 transition-all duration-500 ${
         isScrolled || !onHome
-          ? "top-0 border-b border-[var(--border)] bg-white/90 shadow-lg backdrop-blur-xl dark:bg-black/90"
-          : "top-10 bg-transparent"
+          ? "top-0 border-b border-white/40 bg-white/72 shadow-[0_20px_50px_-24px_rgba(0,0,0,0.3)] backdrop-blur-xl dark:bg-black/72"
+          : "top-6 bg-transparent"
       }`}
     >
       <div className="container-nike">
-        <div className="flex h-20 items-center justify-between">
+        <div className={`flex h-20 items-center justify-between ${!isScrolled && onHome ? "rounded-full px-4" : ""}`}>
           <Logo href="/" className={darkText ? "" : "brightness-[1.12] saturate-110"} priority />
 
           <nav className="hidden items-center gap-8 lg:flex">
